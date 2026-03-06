@@ -152,8 +152,7 @@ export default function Auth() {
                   </Button>
                 </form>
               </CardContent>
-          </Tabs>
-        </Card>
+            </TabsContent>
           </Tabs>
         </Card>
       </motion.div>
