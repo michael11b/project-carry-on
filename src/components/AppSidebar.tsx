@@ -6,6 +6,7 @@ import {
   FolderOpen,
   CalendarDays,
   Users,
+  User2,
   Settings,
   ChevronDown,
   Building2,
