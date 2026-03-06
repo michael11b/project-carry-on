@@ -363,10 +363,16 @@ export default function Studio() {
                           <Badge variant="outline">{usedBrand}</Badge>
                         )}
                       </div>
-                      <Button variant="ghost" size="sm" onClick={handleCopy} className="gap-1.5">
-                        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        {copied ? "Copied" : "Copy"}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" onClick={handleSaveText} disabled={savingText || isStreaming} className="gap-1.5">
+                          {savingText ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                          Save
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={handleCopy} className="gap-1.5">
+                          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                          {copied ? "Copied" : "Copy"}
+                        </Button>
+                      </div>
                     </div>
                     <ScrollArea className="flex-1">
                       <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">
