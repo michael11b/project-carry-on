@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      assets: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string
+          id: string
+          metadata: Json | null
+          org_id: string
+          title: string
+          type: Database["public"]["Enums"]["asset_type"]
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by: string
+          id?: string
+          metadata?: Json | null
+          org_id: string
+          title: string
+          type: Database["public"]["Enums"]["asset_type"]
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          metadata?: Json | null
+          org_id?: string
+          title?: string
+          type?: Database["public"]["Enums"]["asset_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brands: {
         Row: {
           colors: Json | null
@@ -234,6 +275,7 @@ export type Database = {
     }
     Enums: {
       app_role: "owner" | "admin" | "editor" | "viewer" | "client_reviewer"
+      asset_type: "text" | "image"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -362,6 +404,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["owner", "admin", "editor", "viewer", "client_reviewer"],
+      asset_type: ["text", "image"],
     },
   },
 } as const
