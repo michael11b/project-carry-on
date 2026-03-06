@@ -119,6 +119,10 @@ export default function SettingsPage() {
             <Shield className="h-4 w-4" />
             Security
           </TabsTrigger>
+          <TabsTrigger value="integrations" className="gap-2">
+            <Plug className="h-4 w-4" />
+            Integrations
+          </TabsTrigger>
         </TabsList>
 
         {/* ── General ── */}
