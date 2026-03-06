@@ -84,11 +84,23 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    const description = data.choices?.[0]?.message?.content || "";
+    console.log("AI gateway response structure:", JSON.stringify(data, null, 2).slice(0, 2000));
+
+    const message = data.choices?.[0]?.message;
+    const imageUrl = message?.images?.[0]?.image_url?.url;
+    const description = message?.content || "";
+
+    // Check for refusal / safety filter
+    const finishReason = data.choices?.[0]?.finish_reason;
+    if (finishReason === "content_filter" || message?.refusal) {
+      return new Response(JSON.stringify({ error: "The image could not be generated due to content safety filters. Try a different prompt." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!imageUrl) {
-      return new Response(JSON.stringify({ error: "No image was generated. Try a different prompt." }), {
+      return new Response(JSON.stringify({ error: "No image was generated. The model may not have produced an image for this prompt. Try rephrasing or simplifying your request." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
