@@ -7,6 +7,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import Auth from "@/pages/Auth";
+import ResetPassword from "@/pages/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
 import Workspaces from "@/pages/Workspaces";
 import BrandKit from "@/pages/BrandKit";
