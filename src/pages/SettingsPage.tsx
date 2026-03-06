@@ -354,6 +354,11 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── Integrations ── */}
+        <TabsContent value="integrations" className="space-y-4">
+          <FacebookIntegrationCard />
+        </TabsContent>
       </Tabs>
     </div>
   );
