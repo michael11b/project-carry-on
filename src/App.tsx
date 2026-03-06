@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import Auth from "@/pages/Auth";
 import ResetPassword from "@/pages/ResetPassword";
+import ProfilePage from "@/pages/ProfilePage";
 import Dashboard from "@/pages/Dashboard";
 import Workspaces from "@/pages/Workspaces";
 import BrandKit from "@/pages/BrandKit";
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/calendar" element={<ContentCalendar />} />
               <Route path="/team" element={<TeamManagement />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
