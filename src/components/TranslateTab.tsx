@@ -11,14 +11,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 
-interface Brand {
-  id: string;
-  name: string;
-  voice_profile: Record<string, unknown> | null;
-  prohibited_terms: string[] | null;
-  [key: string]: unknown;
-}
+type Brand = Tables<"brands">;
 
 const SOURCE_LANGUAGES = [
   { value: "auto", label: "Auto-detect" },
