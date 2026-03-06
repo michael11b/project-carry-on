@@ -7,9 +7,19 @@ import { Badge } from "@/components/ui/badge";
 import { Palette, Plus, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import BrandEditor from "@/components/BrandEditor";
-import type { Tables } from "@/integrations/supabase/types";
 
-type Brand = Tables<"brands">;
+interface Brand {
+  id: string;
+  workspace_id: string;
+  org_id: string;
+  name: string;
+  logo_url: string | null;
+  colors: Record<string, unknown> | null;
+  fonts: Record<string, unknown> | null;
+  voice_profile: Record<string, unknown> | null;
+  prohibited_terms: string[] | null;
+  created_at: string;
+}
 
 interface ColorsJson {
   primary?: string;
