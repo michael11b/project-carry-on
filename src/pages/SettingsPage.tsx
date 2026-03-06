@@ -10,8 +10,9 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import {
   Building2, CreditCard, Shield, Loader2, Save, Check, Zap, FileText, ImageIcon, Languages, Users,
-  AlertTriangle, Lock, Mail,
+  AlertTriangle, Lock, Mail, Plug,
 } from "lucide-react";
+import FacebookIntegrationCard from "@/components/FacebookIntegrationCard";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
