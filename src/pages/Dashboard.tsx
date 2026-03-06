@@ -1,8 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect, useCallback } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Image, Volume2, Languages, TrendingUp, FileText, Zap, ArrowRight } from "lucide-react";
+import { Sparkles, Image, Volume2, Languages, TrendingUp, FileText, Zap, ArrowRight, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
 
 const quickActions = [
   { title: "Generate Text", description: "Posts, captions, ad copy", icon: FileText, color: "text-primary", path: "/studio" },
@@ -11,14 +13,55 @@ const quickActions = [
   { title: "Translate", description: "Multi-language content", icon: Languages, color: "text-info", path: "/studio" },
 ];
 
-const stats = [
-  { label: "Content Generated", value: "1,847", change: "+12%", icon: Sparkles },
-  { label: "Active Brands", value: "6", change: "+2", icon: Zap },
-  { label: "This Month", value: "342", change: "+28%", icon: TrendingUp },
-];
+interface RecentAsset {
+  id: string;
+  title: string;
+  type: "text" | "image";
+  created_at: string;
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [assetCount, setAssetCount] = useState(0);
+  const [brandCount, setBrandCount] = useState(0);
+  const [scheduledCount, setScheduledCount] = useState(0);
+  const [recentAssets, setRecentAssets] = useState<RecentAsset[]>([]);
+
+  const fetchStats = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoading(false); return; }
+
+    const { data: memberships } = await supabase
+      .from("organization_members")
+      .select("org_id")
+      .eq("user_id", user.id);
+
+    if (!memberships?.length) { setLoading(false); return; }
+
+    const orgIds = memberships.map((m) => m.org_id);
+
+    const [assetsRes, brandsRes, postsRes, recentRes] = await Promise.all([
+      supabase.from("assets").select("id", { count: "exact", head: true }).in("org_id", orgIds),
+      supabase.from("brands").select("id", { count: "exact", head: true }).in("org_id", orgIds),
+      supabase.from("scheduled_posts").select("id", { count: "exact", head: true }).in("org_id", orgIds),
+      supabase.from("assets").select("id, title, type, created_at").in("org_id", orgIds).order("created_at", { ascending: false }).limit(5),
+    ]);
+
+    setAssetCount(assetsRes.count || 0);
+    setBrandCount(brandsRes.count || 0);
+    setScheduledCount(postsRes.count || 0);
+    setRecentAssets((recentRes.data as RecentAsset[]) || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchStats(); }, [fetchStats]);
+
+  const stats = [
+    { label: "Saved Assets", value: assetCount.toString(), icon: Sparkles },
+    { label: "Active Brands", value: brandCount.toString(), icon: Zap },
+    { label: "Scheduled Posts", value: scheduledCount.toString(), icon: TrendingUp },
+  ];
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8">
@@ -44,13 +87,14 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">{stat.label}</p>
-                    <p className="text-2xl font-display font-bold mt-1">{stat.value}</p>
+                    <p className="text-2xl font-display font-bold mt-1">
+                      {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : stat.value}
+                    </p>
                   </div>
                   <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                     <stat.icon className="h-5 w-5 text-primary" />
                   </div>
                 </div>
-                <p className="text-xs text-success mt-2 font-medium">{stat.change} from last period</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -83,12 +127,42 @@ export default function Dashboard() {
       <div>
         <h2 className="text-lg font-display font-semibold mb-4">Recent Activity</h2>
         <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            <Sparkles className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
-            <p>No activity yet. Start by generating your first content!</p>
-            <Button variant="outline" className="mt-4" onClick={() => navigate("/studio")}>
-              Go to Content Studio
-            </Button>
+          <CardContent className="p-6">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : recentAssets.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                <Sparkles className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
+                <p>No activity yet. Start by generating your first content!</p>
+                <Button variant="outline" className="mt-4" onClick={() => navigate("/studio")}>
+                  Go to Content Studio
+                </Button>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {recentAssets.map((asset) => (
+                  <div
+                    key={asset.id}
+                    className="flex items-center justify-between py-3 first:pt-0 last:pb-0 cursor-pointer hover:bg-muted/30 -mx-2 px-2 rounded-md transition-colors"
+                    onClick={() => navigate("/assets")}
+                  >
+                    <div className="flex items-center gap-3">
+                      {asset.type === "text" ? (
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className="text-sm font-medium truncate max-w-[300px]">{asset.title}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(asset.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
