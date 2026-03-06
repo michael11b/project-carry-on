@@ -48,6 +48,7 @@ const createNav = [
 
 const manageNav = [
   { title: "Team", url: "/team", icon: Users },
+  { title: "Profile", url: "/profile", icon: User2 },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
