@@ -56,7 +56,7 @@ export default function AssetLibrary() {
       .in("org_id", orgIds)
       .order("created_at", { ascending: false });
 
-    if (typeFilter !== "all") {
+    if (typeFilter === "text" || typeFilter === "image") {
       query = query.eq("type", typeFilter);
     }
 
