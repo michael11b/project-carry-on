@@ -57,6 +57,9 @@ export default function Studio() {
   const [copied, setCopied] = useState(false);
   const [usedChannel, setUsedChannel] = useState<string>("");
   const [usedBrand, setUsedBrand] = useState<string>("");
+  const [savingText, setSavingText] = useState(false);
+  const [savingImage, setSavingImage] = useState(false);
+  const [usedBrand, setUsedBrand] = useState<string>("");
 
   // Image tab state
   const [imagePrompt, setImagePrompt] = useState("");
