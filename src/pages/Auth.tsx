@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Zap } from "lucide-react";
+import { ForgotPassword } from "@/components/ForgotPassword";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -94,6 +95,7 @@ export default function Auth() {
                   <Button className="w-full" type="submit" disabled={loading}>
                     {loading ? "Logging in…" : "Log In"}
                   </Button>
+                  <ForgotPassword />
                 </CardContent>
               </form>
             </TabsContent>
