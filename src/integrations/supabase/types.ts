@@ -183,6 +183,53 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_posts: {
+        Row: {
+          channel: string | null
+          content: string | null
+          created_at: string
+          created_by: string
+          id: string
+          org_id: string
+          scheduled_at: string
+          status: Database["public"]["Enums"]["post_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          channel?: string | null
+          content?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          org_id: string
+          scheduled_at: string
+          status?: Database["public"]["Enums"]["post_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string | null
+          content?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          org_id?: string
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["post_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -276,6 +323,7 @@ export type Database = {
     Enums: {
       app_role: "owner" | "admin" | "editor" | "viewer" | "client_reviewer"
       asset_type: "text" | "image"
+      post_status: "draft" | "scheduled" | "published"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -405,6 +453,7 @@ export const Constants = {
     Enums: {
       app_role: ["owner", "admin", "editor", "viewer", "client_reviewer"],
       asset_type: ["text", "image"],
+      post_status: ["draft", "scheduled", "published"],
     },
   },
 } as const
