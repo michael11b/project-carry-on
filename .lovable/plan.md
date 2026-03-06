@@ -1,38 +1,61 @@
+# ContentForge — Continuation Plan
 
+## Project Overview
+ContentForge is a multi-tenant content creation platform with AI-powered text generation, image generation, translation, and brand voice management.
 
-## Diagnosis
+## Current State
 
-Your suspicion is correct. Here is what is broken and why:
+### Authentication & Authorization
+- [x] Email/password signup & login (verified ✅)
+- [x] Organization auto-creation on signup
+- [x] Role-based access control (owner/admin/editor/viewer/client_reviewer)
+- [x] Protected routes with AuthProvider
 
-### The Problem
+### Pages & UI
+- [x] Dashboard with stats cards and quick actions (verified ✅)
+- [x] Brand Kit — create/view brands with voice profiles (verified ✅)
+- [x] Content Studio — Text tab with streaming generation (verified ✅)
+- [x] Content Studio — Image tab with platform presets (verified ✅)
+- [x] Content Studio — Translate tab with multi-language support (verified ✅)
+- [x] Sidebar navigation with collapsible layout (verified ✅)
+- [ ] Asset Library (placeholder)
+- [ ] Content Calendar (placeholder)
+- [ ] Team Management (placeholder)
+- [ ] Workspaces (placeholder)
+- [ ] Settings (placeholder)
 
-1. **No Supabase connection exists on this account.** The project has hardcoded Supabase credentials in `.env` pointing to the old account's Supabase instance (`cbnbwvqgaoapicbqpjvg`), but there is no active Supabase connector linked to this Lovable project. This means:
-   - Lovable Cloud features (edge function deployment, database management) are disconnected
-   - The Supabase project from the old account may have its own email/auth settings that don't carry over
+### Database Tables
+- organizations, organization_members, user_roles
+- profiles
+- brands (with voice_profile, colors, fonts, prohibited_terms)
+- workspaces
 
-2. **Signup verification emails not sending** — This is almost certainly because the old Supabase project's auth email settings (SMTP, email templates, rate limits) are tied to the original Lovable account's Cloud setup, which no longer applies here.
+### Edge Functions
+- `generate-text` — SSE streaming text generation with brand voice
+- `generate-image` — AI image generation with platform presets
+- `translate-content` — Multi-language translation
 
-### The Fix
+### End-to-End Test Results (Verified 2026-03-05)
 
-**Option A — Connect the existing Supabase project (if you still have access):**
-- Link the same Supabase project to this Lovable account via Settings → Cloud / Connectors
-- This restores edge functions, email delivery, and database management
+All core features were tested via browser automation against the live preview:
 
-**Option B — Create a fresh Supabase instance via Lovable Cloud (recommended):**
-1. Enable Lovable Cloud on this project — this provisions a new Supabase instance
-2. Run the 3 existing migration files against the new database to recreate the schema
-3. Update `.env` with the new Supabase URL and anon key (auto-configured by Lovable Cloud)
-4. Redeploy edge functions (`generate-image`, `generate-text`, `translate-content`)
-5. Auth emails will work out of the box with the new instance
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Auth — Signup & Login | ✅ Verified | Email/password flow, redirect to dashboard, session persistence |
+| Dashboard | ✅ Verified | Stats cards, quick action tiles, sidebar navigation all render correctly |
+| Brand Kit — CRUD | ✅ Verified | Created "TechVibe" brand with playful tone, style guide, prohibited terms; card renders with voice badge |
+| Text Generation (streaming) | ✅ Verified | SSE streaming works, multi-variant output, channel presets (Instagram), copy button functional |
+| Brand Voice Integration | ✅ Verified | TechVibe brand voice correctly influenced text output — playful tone, emojis, avoided prohibited terms |
+| Image Generation | ✅ Verified | Platform presets work, skeleton loading state displays correctly, image renders with download button |
+| Translation (multi-language) | ✅ Verified | Spanish + French translations generated accurately, per-language copy buttons work, "Use generated text" cross-tab button works |
+| Sidebar Navigation | ✅ Verified | All nav links route correctly, collapsible sidebar works |
 
-### Recommended Steps
+---
 
-1. **Connect Supabase** — either link the old project or enable Lovable Cloud for a new one
-2. **Verify auth config** — ensure email confirmations are enabled in the Supabase dashboard (Authentication → Settings → Email)
-3. **Redeploy edge functions** — they need the correct secrets (`LOVABLE_API_KEY`, etc.)
-4. **Test signup** — create a test account to verify emails are sent
+## Next Steps (Priority Order)
 
-### What I Need From You
-
-Before proceeding, I need to know: do you still have access to the original Supabase project (`cbnbwvqgaoapicbqpjvg`), or should we set up a fresh Supabase instance through Lovable Cloud?
-
+1. **Team Management** — Invite by email, role assignment, member list
+2. **Workspaces CRUD** — Create, rename, archive, switch workspaces
+3. **Asset Library** — Save generated content, browse/filter/search
+4. **Content Calendar** — Schedule and plan content publishing
+5. **Settings** — User profile, org settings, billing placeholder
