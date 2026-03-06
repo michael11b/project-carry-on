@@ -94,6 +94,7 @@ export default function Auth() {
                   <Button className="w-full" type="submit" disabled={loading}>
                     {loading ? "Logging in…" : "Log In"}
                   </Button>
+                  <ForgotPassword />
                 </CardContent>
               </form>
             </TabsContent>
