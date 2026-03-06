@@ -10,18 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, X, Loader2 } from "lucide-react";
-interface Brand {
-  id: string;
-  workspace_id: string;
-  org_id: string;
-  name: string;
-  logo_url: string | null;
-  colors: Record<string, unknown> | null;
-  fonts: Record<string, unknown> | null;
-  voice_profile: Record<string, unknown> | null;
-  prohibited_terms: string[] | null;
-  created_at: string;
-}
+import type { Tables } from "@/integrations/supabase/types";
+
+type Brand = Tables<"brands">;
 
 interface ColorsJson {
   primary: string;
