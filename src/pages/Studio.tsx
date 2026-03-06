@@ -59,7 +59,6 @@ export default function Studio() {
   const [usedBrand, setUsedBrand] = useState<string>("");
   const [savingText, setSavingText] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
-  const [usedBrand, setUsedBrand] = useState<string>("");
 
   // Image tab state
   const [imagePrompt, setImagePrompt] = useState("");
