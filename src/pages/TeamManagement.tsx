@@ -117,7 +117,15 @@ export default function TeamManagement() {
         body: { email: inviteEmail.trim(), orgId, role: inviteRole },
       });
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        // Try to parse the error context for a user-friendly message
+        let msg = error.message;
+        try {
+          const ctx = await (error as any).context?.json?.();
+          if (ctx?.error) msg = ctx.error;
+        } catch {}
+        throw new Error(msg);
+      }
       if (data?.error) throw new Error(data.error);
 
       toast({ title: "Member invited!", description: `${inviteEmail} has been added as ${ROLE_CONFIG[inviteRole].label}.` });
