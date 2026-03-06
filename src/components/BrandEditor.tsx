@@ -105,9 +105,9 @@ export default function BrandEditor({ open, onOpenChange, brand, orgId, workspac
     const payload = {
       name: name.trim(),
       logo_url: logoUrl,
-      colors: colors as unknown as Tables<"brands">["colors"],
-      fonts: fonts as unknown as Tables<"brands">["fonts"],
-      voice_profile: voice as unknown as Tables<"brands">["voice_profile"],
+      colors: colors as unknown as Brand["colors"],
+      fonts: fonts as unknown as Brand["fonts"],
+      voice_profile: voice as unknown as Brand["voice_profile"],
       prohibited_terms: terms,
       org_id: orgId,
       workspace_id: workspaceId,
