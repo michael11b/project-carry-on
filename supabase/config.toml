@@ -1,1 +1,10 @@
 project_id = "kwmubhjtkdcepexzvmva"
+
+[functions.facebook-pages]
+verify_jwt = false
+
+[functions.facebook-publish]
+verify_jwt = false
+
+[functions.facebook-cron]
+verify_jwt = false

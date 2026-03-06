@@ -10,8 +10,9 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import {
   Building2, CreditCard, Shield, Loader2, Save, Check, Zap, FileText, ImageIcon, Languages, Users,
-  AlertTriangle, Lock, Mail,
+  AlertTriangle, Lock, Mail, Plug,
 } from "lucide-react";
+import FacebookIntegrationCard from "@/components/FacebookIntegrationCard";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -117,6 +118,10 @@ export default function SettingsPage() {
           <TabsTrigger value="security" className="gap-2">
             <Shield className="h-4 w-4" />
             Security
+          </TabsTrigger>
+          <TabsTrigger value="integrations" className="gap-2">
+            <Plug className="h-4 w-4" />
+            Integrations
           </TabsTrigger>
         </TabsList>
 
@@ -348,6 +353,11 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── Integrations ── */}
+        <TabsContent value="integrations" className="space-y-4">
+          <FacebookIntegrationCard />
         </TabsContent>
       </Tabs>
     </div>
