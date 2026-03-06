@@ -486,10 +486,16 @@ export default function Studio() {
                           <Badge variant="outline">{usedImageBrand}</Badge>
                         )}
                       </div>
-                      <Button variant="ghost" size="sm" onClick={handleDownloadImage} className="gap-1.5">
-                        <Download className="h-3.5 w-3.5" />
-                        Download
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" onClick={handleSaveImage} disabled={savingImage} className="gap-1.5">
+                          {savingImage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                          Save
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={handleDownloadImage} className="gap-1.5">
+                          <Download className="h-3.5 w-3.5" />
+                          Download
+                        </Button>
+                      </div>
                     </div>
                     <div className="flex-1 flex items-center justify-center">
                       <img
