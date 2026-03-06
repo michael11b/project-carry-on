@@ -109,6 +109,41 @@ export type Database = {
           },
         ]
       }
+      facebook_pages: {
+        Row: {
+          access_token_encrypted: string | null
+          created_at: string
+          id: string
+          org_id: string
+          page_id: string
+          page_name: string | null
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          created_at?: string
+          id?: string
+          org_id: string
+          page_id: string
+          page_name?: string | null
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          created_at?: string
+          id?: string
+          org_id?: string
+          page_id?: string
+          page_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facebook_pages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -189,8 +224,13 @@ export type Database = {
           content: string | null
           created_at: string
           created_by: string
+          facebook_page_id: string | null
           id: string
+          media_url: string | null
           org_id: string
+          post_type: string
+          publish_error: string | null
+          published_fb_id: string | null
           scheduled_at: string
           status: Database["public"]["Enums"]["post_status"]
           title: string
@@ -201,8 +241,13 @@ export type Database = {
           content?: string | null
           created_at?: string
           created_by: string
+          facebook_page_id?: string | null
           id?: string
+          media_url?: string | null
           org_id: string
+          post_type?: string
+          publish_error?: string | null
+          published_fb_id?: string | null
           scheduled_at: string
           status?: Database["public"]["Enums"]["post_status"]
           title: string
@@ -213,8 +258,13 @@ export type Database = {
           content?: string | null
           created_at?: string
           created_by?: string
+          facebook_page_id?: string | null
           id?: string
+          media_url?: string | null
           org_id?: string
+          post_type?: string
+          publish_error?: string | null
+          published_fb_id?: string | null
           scheduled_at?: string
           status?: Database["public"]["Enums"]["post_status"]
           title?: string
