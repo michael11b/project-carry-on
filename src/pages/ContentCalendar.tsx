@@ -17,7 +17,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import {
   CalendarDays, Plus, ChevronLeft, ChevronRight, Loader2, Trash2, Pencil, Clock,
-  CalendarIcon,
+  CalendarIcon, Send, AlertCircle, CheckCircle2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, isToday } from "date-fns";
@@ -35,15 +35,34 @@ interface ScheduledPost {
   status: "draft" | "scheduled" | "published";
   scheduled_at: string;
   created_at: string;
+  facebook_page_id?: string | null;
+  media_url?: string | null;
+  post_type?: string | null;
+  published_fb_id?: string | null;
+  publish_error?: string | null;
+}
+
+interface FacebookPage {
+  id: string;
+  name: string;
+  category?: string;
 }
 
 const CHANNELS = [
+  { value: "facebook", label: "Facebook" },
   { value: "instagram", label: "Instagram" },
   { value: "linkedin", label: "LinkedIn" },
   { value: "tiktok", label: "TikTok" },
   { value: "twitter", label: "Twitter / X" },
   { value: "blog", label: "Blog" },
   { value: "ad_copy", label: "Ad Copy" },
+];
+
+const POST_TYPES = [
+  { value: "text", label: "Text" },
+  { value: "image", label: "Image" },
+  { value: "video", label: "Video" },
+  { value: "reel", label: "Reel" },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -53,6 +72,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const CHANNEL_COLORS: Record<string, string> = {
+  facebook: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   instagram: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
   linkedin: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   tiktok: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400",
@@ -81,6 +101,14 @@ export default function ContentCalendar() {
   const [formTime, setFormTime] = useState("09:00");
   const [saving, setSaving] = useState(false);
 
+  // Facebook-specific form state
+  const [formPostType, setFormPostType] = useState("text");
+  const [formFbPageId, setFormFbPageId] = useState("");
+  const [formMediaUrl, setFormMediaUrl] = useState("");
+  const [fbPages, setFbPages] = useState<FacebookPage[]>([]);
+  const [loadingPages, setLoadingPages] = useState(false);
+  const [publishing, setPublishing] = useState<string | null>(null);
+
   // Day detail popover
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
@@ -98,7 +126,6 @@ export default function ContentCalendar() {
     const firstOrgId = memberships[0].org_id;
     setOrgId(firstOrgId);
 
-    // Fetch posts for a wide range around current month
     const rangeStart = startOfMonth(subMonths(currentMonth, 1)).toISOString();
     const rangeEnd = endOfMonth(addMonths(currentMonth, 1)).toISOString();
 
@@ -116,11 +143,32 @@ export default function ContentCalendar() {
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
+  // Fetch Facebook pages when channel is facebook
+  const fetchFbPages = useCallback(async () => {
+    setLoadingPages(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("facebook-pages");
+      if (error) throw error;
+      setFbPages(data?.pages || []);
+    } catch (e) {
+      console.error("Failed to fetch FB pages:", e);
+      setFbPages([]);
+    } finally {
+      setLoadingPages(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (formChannel === "facebook" && dialogOpen) {
+      fetchFbPages();
+    }
+  }, [formChannel, dialogOpen, fetchFbPages]);
+
   const calendarDays = useMemo(() => {
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
     const days = eachDayOfInterval({ start, end });
-    const startPad = getDay(start); // 0=Sun
+    const startPad = getDay(start);
     return { days, startPad };
   }, [currentMonth]);
 
@@ -142,6 +190,9 @@ export default function ContentCalendar() {
     setFormStatus("draft");
     setFormDate(day || new Date());
     setFormTime("09:00");
+    setFormPostType("text");
+    setFormFbPageId("");
+    setFormMediaUrl("");
     setDialogOpen(true);
   };
 
@@ -154,6 +205,9 @@ export default function ContentCalendar() {
     setFormStatus(post.status === "published" ? "scheduled" : post.status);
     setFormDate(d);
     setFormTime(format(d, "HH:mm"));
+    setFormPostType(post.post_type || "text");
+    setFormFbPageId(post.facebook_page_id || "");
+    setFormMediaUrl(post.media_url || "");
     setDialogOpen(true);
   };
 
@@ -164,6 +218,18 @@ export default function ContentCalendar() {
     const [hours, mins] = formTime.split(":").map(Number);
     const scheduledAt = new Date(formDate);
     scheduledAt.setHours(hours, mins, 0, 0);
+
+    const fbFields = formChannel === "facebook"
+      ? {
+          facebook_page_id: formFbPageId || null,
+          post_type: formPostType,
+          media_url: formMediaUrl || null,
+        }
+      : {
+          facebook_page_id: null,
+          post_type: "text",
+          media_url: null,
+        };
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -179,6 +245,7 @@ export default function ContentCalendar() {
             status: formStatus,
             scheduled_at: scheduledAt.toISOString(),
             updated_at: new Date().toISOString(),
+            ...fbFields,
           })
           .eq("id", editingPost.id);
         if (error) throw error;
@@ -194,6 +261,7 @@ export default function ContentCalendar() {
             channel: formChannel,
             status: formStatus,
             scheduled_at: scheduledAt.toISOString(),
+            ...fbFields,
           });
         if (error) throw error;
         toast({ title: "Post created" });
@@ -217,6 +285,31 @@ export default function ContentCalendar() {
       toast({ title: "Post deleted" });
     } catch (e) {
       toast({ title: "Delete failed", description: (e as Error).message, variant: "destructive" });
+    }
+  };
+
+  const handlePublishNow = async (post: ScheduledPost) => {
+    if (publishing) return;
+    setPublishing(post.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("facebook-publish", {
+        body: { post_id: post.id },
+      });
+      if (error) {
+        let msg = error.message;
+        try {
+          const ctx = typeof error.context === "string" ? JSON.parse(error.context) : error.context;
+          if (ctx?.error) msg = ctx.error;
+        } catch {}
+        throw new Error(msg);
+      }
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Published to Facebook!", description: `Post ID: ${data?.fb_id}` });
+      fetchPosts();
+    } catch (e) {
+      toast({ title: "Publish failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setPublishing(null);
     }
   };
 
@@ -257,7 +350,6 @@ export default function ContentCalendar() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            {/* Weekday headers */}
             <div className="grid grid-cols-7 border-b border-border">
               {WEEKDAYS.map((d) => (
                 <div key={d} className="py-2 text-center text-xs font-medium text-muted-foreground">
@@ -266,9 +358,7 @@ export default function ContentCalendar() {
               ))}
             </div>
 
-            {/* Day grid */}
             <div className="grid grid-cols-7">
-              {/* Empty padding cells */}
               {Array.from({ length: calendarDays.startPad }).map((_, i) => (
                 <div key={`pad-${i}`} className="min-h-[100px] border-b border-r border-border bg-muted/20" />
               ))}
@@ -365,6 +455,11 @@ export default function ContentCalendar() {
                             {CHANNELS.find((c) => c.value === post.channel)?.label || post.channel}
                           </Badge>
                         )}
+                        {post.channel === "facebook" && post.post_type && post.post_type !== "text" && (
+                          <Badge variant="outline" className="text-[10px] capitalize">
+                            {post.post_type}
+                          </Badge>
+                        )}
                         <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {format(new Date(post.scheduled_at), "h:mm a")}
@@ -373,8 +468,38 @@ export default function ContentCalendar() {
                       {post.content && (
                         <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{post.content}</p>
                       )}
+                      {/* Facebook publish status */}
+                      {post.channel === "facebook" && post.published_fb_id && (
+                        <div className="flex items-center gap-1 text-[10px] text-green-600 mt-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Published (ID: {post.published_fb_id.substring(0, 20)}…)
+                        </div>
+                      )}
+                      {post.channel === "facebook" && post.publish_error && !post.published_fb_id && (
+                        <div className="flex items-center gap-1 text-[10px] text-destructive mt-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {post.publish_error}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 ml-2 shrink-0">
+                      {/* Publish Now for Facebook posts */}
+                      {post.channel === "facebook" && !post.published_fb_id && post.facebook_page_id && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-blue-600 hover:text-blue-700"
+                          onClick={() => handlePublishNow(post)}
+                          disabled={publishing === post.id}
+                          title="Publish now to Facebook"
+                        >
+                          {publishing === post.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(post)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -446,6 +571,61 @@ export default function ContentCalendar() {
                 </Select>
               </div>
             </div>
+
+            {/* Facebook-specific fields */}
+            {formChannel === "facebook" && (
+              <div className="space-y-4 p-3 rounded-lg border border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
+                <p className="text-xs font-medium text-blue-700 dark:text-blue-400">Facebook Settings</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Facebook Page</Label>
+                    <Select value={formFbPageId} onValueChange={setFormFbPageId} disabled={saving || loadingPages}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingPages ? "Loading pages…" : "Select page"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fbPages.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))}
+                        {!loadingPages && fbPages.length === 0 && (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                            No pages found. Check your token in Settings.
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Post Type</Label>
+                    <Select value={formPostType} onValueChange={setFormPostType} disabled={saving}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {POST_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {formPostType !== "text" && (
+                  <div className="space-y-2">
+                    <Label>Media URL</Label>
+                    <Input
+                      placeholder={formPostType === "image" ? "https://example.com/photo.jpg" : "https://example.com/video.mp4"}
+                      value={formMediaUrl}
+                      onChange={(e) => setFormMediaUrl(e.target.value)}
+                      disabled={saving}
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Provide a publicly accessible URL for the {formPostType}.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Date</Label>
