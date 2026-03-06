@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download } from "lucide-react";
+import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,6 +57,8 @@ export default function Studio() {
   const [copied, setCopied] = useState(false);
   const [usedChannel, setUsedChannel] = useState<string>("");
   const [usedBrand, setUsedBrand] = useState<string>("");
+  const [savingText, setSavingText] = useState(false);
+  const [savingImage, setSavingImage] = useState(false);
 
   // Image tab state
   const [imagePrompt, setImagePrompt] = useState("");
@@ -132,6 +134,59 @@ export default function Studio() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [output]);
+
+  const handleSaveText = useCallback(async () => {
+    if (!output) return;
+    setSavingText(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { data: memberships } = await supabase.from("organization_members").select("org_id").eq("user_id", user.id);
+      if (!memberships?.length) throw new Error("No organization");
+      const title = prompt.trim().slice(0, 80) || "Untitled text";
+      const { error } = await supabase.from("assets").insert({
+        org_id: memberships[0].org_id,
+        created_by: user.id,
+        type: "text" as const,
+        title,
+        content: output,
+        metadata: { channel: usedChannel || "", brand: usedBrand || "" },
+      });
+      if (error) throw error;
+      toast({ title: "Saved to library", description: "Text content saved to your Asset Library." });
+    } catch (e) {
+      toast({ title: "Save failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSavingText(false);
+    }
+  }, [output, prompt, usedChannel, usedBrand, toast]);
+
+  const handleSaveImage = useCallback(async () => {
+    if (!imageUrl) return;
+    setSavingImage(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { data: memberships } = await supabase.from("organization_members").select("org_id").eq("user_id", user.id);
+      if (!memberships?.length) throw new Error("No organization");
+      const title = imagePrompt.trim().slice(0, 80) || "Untitled image";
+      const platformLabel = IMAGE_PLATFORMS.find((p) => p.value === usedImagePlatform)?.label || "";
+      const { error } = await supabase.from("assets").insert({
+        org_id: memberships[0].org_id,
+        created_by: user.id,
+        type: "image" as const,
+        title,
+        content: imageUrl,
+        metadata: { platform: platformLabel, brand: usedImageBrand || "" },
+      });
+      if (error) throw error;
+      toast({ title: "Saved to library", description: "Image saved to your Asset Library." });
+    } catch (e) {
+      toast({ title: "Save failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSavingImage(false);
+    }
+  }, [imageUrl, imagePrompt, usedImagePlatform, usedImageBrand, toast]);
 
   const handleGenerateImage = useCallback(async () => {
     if (!imagePrompt.trim()) {
@@ -308,10 +363,16 @@ export default function Studio() {
                           <Badge variant="outline">{usedBrand}</Badge>
                         )}
                       </div>
-                      <Button variant="ghost" size="sm" onClick={handleCopy} className="gap-1.5">
-                        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        {copied ? "Copied" : "Copy"}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" onClick={handleSaveText} disabled={savingText || isStreaming} className="gap-1.5">
+                          {savingText ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                          Save
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={handleCopy} className="gap-1.5">
+                          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                          {copied ? "Copied" : "Copy"}
+                        </Button>
+                      </div>
                     </div>
                     <ScrollArea className="flex-1">
                       <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">
@@ -425,10 +486,16 @@ export default function Studio() {
                           <Badge variant="outline">{usedImageBrand}</Badge>
                         )}
                       </div>
-                      <Button variant="ghost" size="sm" onClick={handleDownloadImage} className="gap-1.5">
-                        <Download className="h-3.5 w-3.5" />
-                        Download
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" onClick={handleSaveImage} disabled={savingImage} className="gap-1.5">
+                          {savingImage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                          Save
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={handleDownloadImage} className="gap-1.5">
+                          <Download className="h-3.5 w-3.5" />
+                          Download
+                        </Button>
+                      </div>
                     </div>
                     <div className="flex-1 flex items-center justify-center">
                       <img
