@@ -1,0 +1,7 @@
+project_id = "cbnbwvqgaoapicbqpjvg"
+
+[functions.generate-image]
+verify_jwt = false
+
+[functions.translate-content]
+verify_jwt = false

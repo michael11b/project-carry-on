@@ -1,0 +1,147 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 230 25% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 230 25% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 230 25% 10%;
+
+    --primary: 252 85% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 94%;
+    --secondary-foreground: 230 25% 10%;
+
+    --muted: 220 14% 94%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 168 80% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 252 85% 60%;
+
+    --radius: 0.625rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 230 25% 10%;
+    --sidebar-primary: 252 85% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 252 85% 96%;
+    --sidebar-accent-foreground: 252 85% 40%;
+    --sidebar-border: 220 13% 92%;
+    --sidebar-ring: 252 85% 60%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --success: 168 80% 42%;
+    --success-foreground: 0 0% 100%;
+    --info: 210 100% 52%;
+    --info-foreground: 0 0% 100%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(252, 85%, 60%), hsl(280, 80%, 55%));
+    --gradient-accent: linear-gradient(135deg, hsl(168, 80%, 42%), hsl(190, 80%, 50%));
+    --gradient-surface: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(220, 14%, 97%) 100%);
+
+    --shadow-sm: 0 1px 2px 0 hsl(230 25% 10% / 0.04);
+    --shadow-md: 0 4px 12px -2px hsl(230 25% 10% / 0.08);
+    --shadow-lg: 0 12px 32px -4px hsl(230 25% 10% / 0.12);
+    --shadow-glow: 0 0 20px -4px hsl(252 85% 60% / 0.3);
+  }
+
+  .dark {
+    --background: 230 25% 7%;
+    --foreground: 220 14% 96%;
+
+    --card: 230 22% 10%;
+    --card-foreground: 220 14% 96%;
+
+    --popover: 230 22% 10%;
+    --popover-foreground: 220 14% 96%;
+
+    --primary: 252 85% 63%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 230 20% 15%;
+    --secondary-foreground: 220 14% 96%;
+
+    --muted: 230 20% 15%;
+    --muted-foreground: 220 9% 55%;
+
+    --accent: 168 80% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 230 20% 16%;
+    --input: 230 20% 16%;
+    --ring: 252 85% 63%;
+
+    --sidebar-background: 230 25% 8%;
+    --sidebar-foreground: 220 14% 90%;
+    --sidebar-primary: 252 85% 63%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 252 85% 15%;
+    --sidebar-accent-foreground: 252 85% 75%;
+    --sidebar-border: 230 20% 14%;
+    --sidebar-ring: 252 85% 63%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --success: 168 80% 45%;
+    --success-foreground: 0 0% 100%;
+    --info: 210 100% 52%;
+    --info-foreground: 0 0% 100%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(252, 85%, 63%), hsl(280, 80%, 58%));
+    --gradient-accent: linear-gradient(135deg, hsl(168, 80%, 45%), hsl(190, 80%, 52%));
+    --gradient-surface: linear-gradient(180deg, hsl(230, 25%, 8%) 0%, hsl(230, 22%, 10%) 100%);
+
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.2);
+    --shadow-md: 0 4px 12px -2px hsl(0 0% 0% / 0.3);
+    --shadow-lg: 0 12px 32px -4px hsl(0 0% 0% / 0.4);
+    --shadow-glow: 0 0 20px -4px hsl(252 85% 63% / 0.4);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+  }
+
+  .text-gradient-primary {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
