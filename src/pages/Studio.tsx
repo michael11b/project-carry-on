@@ -136,6 +136,59 @@ export default function Studio() {
     setTimeout(() => setCopied(false), 2000);
   }, [output]);
 
+  const handleSaveText = useCallback(async () => {
+    if (!output) return;
+    setSavingText(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { data: memberships } = await supabase.from("organization_members").select("org_id").eq("user_id", user.id);
+      if (!memberships?.length) throw new Error("No organization");
+      const title = prompt.trim().slice(0, 80) || "Untitled text";
+      const { error } = await supabase.from("assets").insert({
+        org_id: memberships[0].org_id,
+        created_by: user.id,
+        type: "text" as const,
+        title,
+        content: output,
+        metadata: { channel: usedChannel || "", brand: usedBrand || "" },
+      });
+      if (error) throw error;
+      toast({ title: "Saved to library", description: "Text content saved to your Asset Library." });
+    } catch (e) {
+      toast({ title: "Save failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSavingText(false);
+    }
+  }, [output, prompt, usedChannel, usedBrand, toast]);
+
+  const handleSaveImage = useCallback(async () => {
+    if (!imageUrl) return;
+    setSavingImage(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { data: memberships } = await supabase.from("organization_members").select("org_id").eq("user_id", user.id);
+      if (!memberships?.length) throw new Error("No organization");
+      const title = imagePrompt.trim().slice(0, 80) || "Untitled image";
+      const platformLabel = IMAGE_PLATFORMS.find((p) => p.value === usedImagePlatform)?.label || "";
+      const { error } = await supabase.from("assets").insert({
+        org_id: memberships[0].org_id,
+        created_by: user.id,
+        type: "image" as const,
+        title,
+        content: imageUrl,
+        metadata: { platform: platformLabel, brand: usedImageBrand || "" },
+      });
+      if (error) throw error;
+      toast({ title: "Saved to library", description: "Image saved to your Asset Library." });
+    } catch (e) {
+      toast({ title: "Save failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSavingImage(false);
+    }
+  }, [imageUrl, imagePrompt, usedImagePlatform, usedImageBrand, toast]);
+
   const handleGenerateImage = useCallback(async () => {
     if (!imagePrompt.trim()) {
       toast({ title: "Enter a prompt", description: "Describe the image you want to generate.", variant: "destructive" });
