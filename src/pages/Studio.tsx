@@ -160,7 +160,7 @@ export default function Studio() {
         toast({ title: "Generation failed", description: error, variant: "destructive" });
       },
     });
-  }, [prompt, channel, variantCount, selectedBrandId, brands, toast]);
+  }, [prompt, channel, variantCount, selectedBrandId, selectedPageProfileId, brands, pageProfiles, toast]);
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(output);
