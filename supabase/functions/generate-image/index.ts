@@ -28,8 +28,8 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Build enhanced prompt
-    let enhancedPrompt = prompt;
+    // Build enhanced prompt – force image generation
+    let enhancedPrompt = `Generate an image based on the following description. You MUST produce an image, do not ask clarifying questions. Just create the best image you can:\n\n${prompt}`;
 
     if (platform && PLATFORM_PRESETS[platform]) {
       enhancedPrompt += `\n\nImage dimensions/format: ${PLATFORM_PRESETS[platform]}.`;
