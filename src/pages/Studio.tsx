@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { streamGenerate } from "@/lib/streamChat";
 import TranslateTab from "@/components/TranslateTab";
+import PublishPanel from "@/components/PublishPanel";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Brand = Tables<"brands">;
@@ -380,6 +381,11 @@ export default function Studio() {
                         {isStreaming && <span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom rounded-sm" />}
                       </div>
                     </ScrollArea>
+                    <PublishPanel
+                      content={output}
+                      defaultTitle={prompt.trim().slice(0, 80)}
+                      hasContent={!!output && !isStreaming}
+                    />
                   </>
                 ) : (
                   <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -507,6 +513,12 @@ export default function Studio() {
                     {imageDescription && (
                       <p className="text-sm text-muted-foreground mt-3">{imageDescription}</p>
                     )}
+                    <PublishPanel
+                      content={imageDescription || imagePrompt}
+                      mediaUrl={imageUrl}
+                      defaultTitle={imagePrompt.trim().slice(0, 80)}
+                      hasContent={!!imageUrl}
+                    />
                   </>
                 ) : (
                   <div className="flex-1 flex items-center justify-center text-muted-foreground">
