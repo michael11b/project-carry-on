@@ -22,6 +22,8 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
   const [daysUntilExpiry, setDaysUntilExpiry] = useState<number | null>(null);
   const [tokenExchangedAt, setTokenExchangedAt] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
+  const [showRefresh, setShowRefresh] = useState(false);
+  const [refreshLoading, setRefreshLoading] = useState(false);
 
   // Setup form fields
   const [shortLivedToken, setShortLivedToken] = useState("");
@@ -29,6 +31,7 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
   const [appSecret, setAppSecret] = useState("");
   const [encryptionPassword, setEncryptionPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [refreshPassword, setRefreshPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
@@ -111,11 +114,37 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
     }
   };
 
+  const handleRefresh = async () => {
+    if (!orgId) return;
+    if (!refreshPassword || refreshPassword.length < 8) {
+      toast({ title: "Password required", description: "Enter your encryption password (min 8 chars).", variant: "destructive" });
+      return;
+    }
+    setRefreshLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("facebook-refresh", {
+        body: { org_id: orgId, encryption_password: refreshPassword },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: data.token_refreshed ? "Tokens refreshed!" : "Pages refreshed!",
+        description: `${data.pages?.length || 0} page(s) updated.${data.token_refreshed ? " User token extended for 60 more days." : ""}`,
+      });
+      setRefreshPassword("");
+      setShowRefresh(false);
+      await fetchPages();
+    } catch (e) {
+      toast({ title: "Refresh failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setRefreshLoading(false);
+    }
+  };
+
   const handleDisconnect = async () => {
     if (!orgId) return;
     setLoading(true);
     try {
-      // Delete credentials and pages for this org
       await supabase.from("facebook_credentials").delete().eq("org_id", orgId);
       await supabase.from("facebook_pages").delete().eq("org_id", orgId);
       setConnected(false);
@@ -330,12 +359,47 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
           </div>
         )}
 
+        {/* Refresh Tokens prompt */}
+        {connected === true && showRefresh && (
+          <div className="space-y-3 p-4 rounded-lg border border-border bg-muted/30">
+            <p className="text-sm font-medium">Refresh Tokens</p>
+            <p className="text-xs text-muted-foreground">
+              Enter your encryption password to re-fetch page tokens from Facebook and extend your user token.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="fb-refresh-pass">Encryption Password</Label>
+              <Input
+                id="fb-refresh-pass"
+                type="password"
+                placeholder="Your encryption password"
+                value={refreshPassword}
+                onChange={(e) => setRefreshPassword(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleRefresh} disabled={refreshLoading} size="sm" className="gap-2">
+                {refreshLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                {refreshLoading ? "Refreshing…" : "Refresh Tokens"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setShowRefresh(false); setRefreshPassword(""); }} disabled={refreshLoading}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="gap-2" onClick={fetchPages} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            Refresh List
           </Button>
+          {connected === true && !showRefresh && (
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowRefresh(true)} disabled={loading}>
+              <Shield className="h-4 w-4" />
+              Refresh Tokens
+            </Button>
+          )}
           {connected === true && (
             <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={handleDisconnect} disabled={loading}>
               <Trash2 className="h-4 w-4" />
