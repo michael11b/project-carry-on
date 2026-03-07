@@ -529,6 +529,24 @@ export default function ContentCalendar() {
                           )}
                         </Button>
                       )}
+                      {/* Publish Now for Instagram posts */}
+                      {post.channel === "instagram" && !post.published_fb_id && post.instagram_account_id && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-pink-600 hover:text-pink-700"
+                          onClick={() => handlePublishInstagram(post)}
+                          disabled={publishing === post.id}
+                          title="Publish now to Instagram"
+                        >
+                          {publishing === post.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      )}
+                      )}
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(post)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
