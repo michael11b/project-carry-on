@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { streamGenerate } from "@/lib/streamChat";
 import TranslateTab from "@/components/TranslateTab";
+import PublishPanel from "@/components/PublishPanel";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Brand = Tables<"brands">;
