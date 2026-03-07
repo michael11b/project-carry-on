@@ -274,7 +274,7 @@ export default function ContentCalendar() {
             status: formStatus,
             scheduled_at: scheduledAt.toISOString(),
             updated_at: new Date().toISOString(),
-            ...fbFields,
+            ...channelFields,
           })
           .eq("id", editingPost.id);
         if (error) throw error;
