@@ -342,7 +342,31 @@ export default function ContentCalendar() {
     }
   };
 
-  const dayPosts = selectedDay
+  const handlePublishInstagram = async (post: ScheduledPost) => {
+    if (publishing) return;
+    setPublishing(post.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("instagram-publish", {
+        body: { post_id: post.id },
+      });
+      if (error) {
+        let msg = error.message;
+        try {
+          const ctx = typeof error.context === "string" ? JSON.parse(error.context) : error.context;
+          if (ctx?.error) msg = ctx.error;
+        } catch {}
+        throw new Error(msg);
+      }
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Published to Instagram!", description: `Post ID: ${data?.ig_id}` });
+      fetchPosts();
+    } catch (e) {
+      toast({ title: "Publish failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setPublishing(null);
+    }
+  };
+
     ? postsByDay.get(format(selectedDay, "yyyy-MM-dd")) || []
     : [];
 
