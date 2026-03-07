@@ -71,6 +71,11 @@ const POST_TYPES = [
   { value: "reel", label: "Reel" },
 ];
 
+const IG_POST_TYPES = [
+  { value: "image", label: "Image" },
+  { value: "reel", label: "Reel" },
+];
+
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
   scheduled: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
