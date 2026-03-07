@@ -134,6 +134,7 @@ serve(async (req) => {
 
     // Delete old pages and insert fresh ones
     await supabase.from("facebook_pages").delete().eq("org_id", org_id);
+    await supabase.from("instagram_accounts").delete().eq("org_id", org_id);
 
     const pageResults: Array<{ id: string; name: string; category?: string }> = [];
     const igResults: Array<{ ig_user_id: string; ig_username: string; facebook_page_id: string }> = [];
