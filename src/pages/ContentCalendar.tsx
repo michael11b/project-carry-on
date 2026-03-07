@@ -223,6 +223,7 @@ export default function ContentCalendar() {
     setFormTime(format(d, "HH:mm"));
     setFormPostType(post.post_type || "text");
     setFormFbPageId(post.facebook_page_id || "");
+    setFormIgAccountId(post.instagram_account_id || "");
     setFormMediaUrl(post.media_url || "");
     setDialogOpen(true);
   };
