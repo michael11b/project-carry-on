@@ -4,13 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, RefreshCw, Trash2, Shield, Eye, EyeOff, AlertTriangle, Clock } from "lucide-react";
+import { Loader2, RefreshCw, Trash2, Shield, Eye, EyeOff, AlertTriangle, Clock, Instagram } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface FacebookPage {
   id: string;
   name: string;
+}
+
+interface InstagramAccount {
+  ig_user_id: string;
+  ig_username: string;
+  facebook_page_id: string;
 }
 
 export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {

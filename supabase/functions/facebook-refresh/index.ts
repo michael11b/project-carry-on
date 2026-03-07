@@ -192,6 +192,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       pages: pageResults,
+      instagram_accounts: igResults,
       token_refreshed: freshToken !== userToken,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -67,6 +67,11 @@ serve(async (req) => {
         id: p.page_id,
         name: p.page_name,
       })),
+      instagram_accounts: (igAccounts || []).map((ig: any) => ({
+        ig_user_id: ig.ig_user_id,
+        ig_username: ig.ig_username,
+        facebook_page_id: ig.facebook_page_id,
+      })),
       token_exchanged_at: tokenExchangedAt,
       days_until_expiry: daysUntilExpiry,
     }), {
