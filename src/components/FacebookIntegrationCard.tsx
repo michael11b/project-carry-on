@@ -22,6 +22,7 @@ interface InstagramAccount {
 export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
   const { toast } = useToast();
   const [pages, setPages] = useState<FacebookPage[]>([]);
+  const [igAccounts, setIgAccounts] = useState<InstagramAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [setupLoading, setSetupLoading] = useState(false);
   const [connected, setConnected] = useState<boolean | null>(null);
