@@ -32,10 +32,10 @@ serve(async (req) => {
 
     if (error) throw error;
 
-    // Check if credentials exist for this org
+    // Check if credentials exist for this org and get token age
     const { data: creds } = await supabase
       .from("facebook_credentials")
-      .select("id")
+      .select("id, updated_at")
       .eq("org_id", orgId)
       .maybeSingle();
 
