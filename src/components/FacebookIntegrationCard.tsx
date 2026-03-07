@@ -206,8 +206,26 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
           </div>
         )}
 
-        {connected === true && pages.length === 0 && (
-          <p className="text-sm text-muted-foreground py-2">Credentials stored but no pages found.</p>
+        {/* Instagram accounts */}
+        {connected === true && igAccounts.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium flex items-center gap-1.5">
+              <Instagram className="h-4 w-4" /> Linked Instagram Accounts
+            </p>
+            {igAccounts.map((ig) => (
+              <div key={ig.ig_user_id} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                <div>
+                  <p className="text-sm font-medium">@{ig.ig_username || ig.ig_user_id}</p>
+                  <p className="text-xs text-muted-foreground">ID: {ig.ig_user_id}</p>
+                </div>
+                <Badge variant="outline" className="text-xs">Active</Badge>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {connected === true && pages.length === 0 && igAccounts.length === 0 && (
+          <p className="text-sm text-muted-foreground py-2">Credentials stored but no pages or accounts found.</p>
         )}
 
         {/* Token expiry warning */}
