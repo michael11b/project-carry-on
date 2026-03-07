@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save } from "lucide-react";
+import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save, Facebook } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,19 @@ import PublishPanel from "@/components/PublishPanel";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Brand = Tables<"brands">;
+
+interface PageProfile {
+  id: string;
+  facebook_page_id: string;
+  page_name: string;
+  description: string;
+  target_audience: string;
+  content_tone: string;
+  content_topics: string[];
+  posting_goals: string;
+  hashtag_preferences: string;
+  system_prompt: string;
+}
 
 const CHANNELS = [
   { value: "instagram", label: "Instagram" },
@@ -61,6 +74,10 @@ export default function Studio() {
   const [savingText, setSavingText] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
 
+  // Page profile state
+  const [pageProfiles, setPageProfiles] = useState<PageProfile[]>([]);
+  const [selectedPageProfileId, setSelectedPageProfileId] = useState<string>("");
+
   // Image tab state
   const [imagePrompt, setImagePrompt] = useState("");
   const [imagePlatform, setImagePlatform] = useState<string>("");
@@ -71,9 +88,9 @@ export default function Studio() {
   const [usedImagePlatform, setUsedImagePlatform] = useState<string>("");
   const [usedImageBrand, setUsedImageBrand] = useState<string>("");
 
-  // Fetch brands for the current user's org
+  // Fetch brands and page profiles for the current user's org
   useEffect(() => {
-    async function fetchBrands() {
+    async function fetchData() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -91,8 +108,16 @@ export default function Studio() {
         .in("org_id", orgIds);
 
       if (data) setBrands(data);
+
+      // Fetch page profiles
+      const { data: profiles } = await supabase
+        .from("page_profiles")
+        .select("*")
+        .in("org_id", orgIds);
+
+      if (profiles) setPageProfiles(profiles as unknown as PageProfile[]);
     }
-    fetchBrands();
+    fetchData();
   }, []);
 
   const handleGenerate = useCallback(async () => {
@@ -116,8 +141,15 @@ export default function Studio() {
         }
       : undefined;
 
+    // Build prompt with page profile context
+    const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
+    let fullPrompt = prompt.trim();
+    if (selectedPage?.system_prompt) {
+      fullPrompt = `${selectedPage.system_prompt}\n\n---\nUser request: ${fullPrompt}`;
+    }
+
     await streamGenerate({
-      prompt: prompt.trim(),
+      prompt: fullPrompt,
       brandVoice,
       channel: channel || undefined,
       variantCount: parseInt(variantCount),
@@ -128,7 +160,7 @@ export default function Studio() {
         toast({ title: "Generation failed", description: error, variant: "destructive" });
       },
     });
-  }, [prompt, channel, variantCount, selectedBrandId, brands, toast]);
+  }, [prompt, channel, variantCount, selectedBrandId, selectedPageProfileId, brands, pageProfiles, toast]);
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(output);
@@ -211,10 +243,17 @@ export default function Studio() {
         }
       : undefined;
 
+    // Build prompt with page profile context for images
+    const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
+    let fullImagePrompt = imagePrompt.trim();
+    if (selectedPage?.system_prompt) {
+      fullImagePrompt = `${selectedPage.system_prompt}\n\n---\nImage request: ${fullImagePrompt}`;
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke("generate-image", {
         body: {
-          prompt: imagePrompt.trim(),
+          prompt: fullImagePrompt,
           brandStyle,
           platform: imagePlatform || undefined,
         },
@@ -244,8 +283,28 @@ export default function Studio() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-display font-bold tracking-tight">Content Studio</h1>
-        <p className="text-muted-foreground mt-1">Generate multi-modal content powered by AI.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-display font-bold tracking-tight">Content Studio</h1>
+            <p className="text-muted-foreground mt-1">Generate multi-modal content powered by AI.</p>
+          </div>
+          {pageProfiles.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Facebook className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedPageProfileId} onValueChange={setSelectedPageProfileId}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="No page selected" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No page (general)</SelectItem>
+                  {pageProfiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.page_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
       </motion.div>
 
       <Tabs defaultValue="text" className="space-y-4">
