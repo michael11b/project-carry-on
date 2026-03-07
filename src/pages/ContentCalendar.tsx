@@ -163,9 +163,11 @@ export default function ContentCalendar() {
       const { data, error } = await supabase.functions.invoke("facebook-pages");
       if (error) throw error;
       setFbPages(data?.pages || []);
+      setIgAccounts(data?.instagram_accounts || []);
     } catch (e) {
       console.error("Failed to fetch FB pages:", e);
       setFbPages([]);
+      setIgAccounts([]);
     } finally {
       setLoadingPages(false);
     }
