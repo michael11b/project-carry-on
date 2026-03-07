@@ -697,7 +697,60 @@ export default function ContentCalendar() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Instagram-specific fields */}
+            {formChannel === "instagram" && (
+              <div className="space-y-4 p-3 rounded-lg border border-pink-200 bg-pink-50/50 dark:border-pink-800 dark:bg-pink-950/20">
+                <p className="text-xs font-medium text-pink-700 dark:text-pink-400">Instagram Settings</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Instagram Account</Label>
+                    <Select value={formIgAccountId} onValueChange={setFormIgAccountId} disabled={saving || loadingPages}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingPages ? "Loading…" : "Select account"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {igAccounts.map((ig) => (
+                          <SelectItem key={ig.ig_user_id} value={ig.ig_user_id}>
+                            @{ig.ig_username || ig.ig_user_id}
+                          </SelectItem>
+                        ))}
+                        {!loadingPages && igAccounts.length === 0 && (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                            No Instagram accounts found. Link one via Facebook setup.
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Post Type</Label>
+                    <Select value={formPostType === "text" ? "image" : formPostType} onValueChange={setFormPostType} disabled={saving}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {IG_POST_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Media URL</Label>
+                  <Input
+                    placeholder={formPostType === "reel" ? "https://example.com/video.mp4" : "https://example.com/photo.jpg"}
+                    value={formMediaUrl}
+                    onChange={(e) => setFormMediaUrl(e.target.value)}
+                    disabled={saving}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Instagram requires a publicly accessible media URL for all posts.
+                  </p>
+                </div>
+              </div>
+            )}
+
               <div className="space-y-2">
                 <Label>Date</Label>
                 <Popover>
