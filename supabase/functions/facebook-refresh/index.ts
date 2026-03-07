@@ -136,6 +136,8 @@ serve(async (req) => {
     await supabase.from("facebook_pages").delete().eq("org_id", org_id);
 
     const pageResults: Array<{ id: string; name: string; category?: string }> = [];
+    const igResults: Array<{ ig_user_id: string; ig_username: string; facebook_page_id: string }> = [];
+
     for (const page of pages) {
       const pageSalt = crypto.getRandomValues(new Uint8Array(16));
       const pageSaltB64 = toBase64(pageSalt);
@@ -151,6 +153,39 @@ serve(async (req) => {
       });
 
       pageResults.push({ id: page.id, name: page.name, category: page.category });
+
+      // Discover linked Instagram Business account
+      try {
+        const igRes = await fetch(
+          `https://graph.facebook.com/v22.0/${page.id}?fields=instagram_business_account{id,username}&access_token=${encodeURIComponent(page.access_token)}`
+        );
+        const igData = await igRes.json();
+        const igAccount = igData?.instagram_business_account;
+        if (igAccount?.id) {
+          await supabase
+            .from("instagram_accounts")
+            .delete()
+            .eq("org_id", org_id)
+            .eq("ig_user_id", igAccount.id);
+
+          await supabase
+            .from("instagram_accounts")
+            .insert({
+              org_id,
+              facebook_page_id: page.id,
+              ig_user_id: igAccount.id,
+              ig_username: igAccount.username || null,
+            });
+
+          igResults.push({
+            ig_user_id: igAccount.id,
+            ig_username: igAccount.username || "",
+            facebook_page_id: page.id,
+          });
+        }
+      } catch (e) {
+        console.error(`Failed to fetch IG account for page ${page.id}:`, e);
+      }
     }
 
     return new Response(JSON.stringify({
