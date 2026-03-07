@@ -2,36 +2,45 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, RefreshCw, Trash2, Shield, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface FacebookPage {
   id: string;
   name: string;
-  category?: string;
 }
 
-export default function FacebookIntegrationCard() {
+export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
   const { toast } = useToast();
   const [pages, setPages] = useState<FacebookPage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [tokenConfigured, setTokenConfigured] = useState<boolean | null>(null);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [connected, setConnected] = useState<boolean | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
+
+  // Setup form fields
+  const [shortLivedToken, setShortLivedToken] = useState("");
+  const [appId, setAppId] = useState("");
+  const [appSecret, setAppSecret] = useState("");
+  const [encryptionPassword, setEncryptionPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
 
   const fetchPages = useCallback(async () => {
+    if (!orgId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("facebook-pages");
+      const { data, error } = await supabase.functions.invoke("facebook-pages", {
+        body: { org_id: orgId },
+      });
       if (error) throw error;
-      if (data?.error) {
-        if (data.error.includes("not configured")) {
-          setTokenConfigured(false);
-          setPages([]);
-          return;
-        }
-        throw new Error(data.error);
-      }
-      setTokenConfigured(true);
+      if (data?.error) throw new Error(data.error);
+      setConnected(data?.connected ?? false);
       setPages(data?.pages || []);
     } catch (e) {
       console.error("Failed to fetch FB pages:", e);
@@ -39,9 +48,81 @@ export default function FacebookIntegrationCard() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, orgId]);
 
   useEffect(() => { fetchPages(); }, [fetchPages]);
+
+  const handleSetup = async () => {
+    if (!orgId) {
+      toast({ title: "Error", description: "Organization not found", variant: "destructive" });
+      return;
+    }
+    if (encryptionPassword !== confirmPassword) {
+      toast({ title: "Password mismatch", description: "Encryption passwords do not match.", variant: "destructive" });
+      return;
+    }
+    if (encryptionPassword.length < 8) {
+      toast({ title: "Weak password", description: "Encryption password must be at least 8 characters.", variant: "destructive" });
+      return;
+    }
+    if (!shortLivedToken || !appId || !appSecret) {
+      toast({ title: "Missing fields", description: "Please fill in all required fields.", variant: "destructive" });
+      return;
+    }
+
+    setSetupLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("facebook-setup", {
+        body: {
+          short_lived_token: shortLivedToken,
+          app_id: appId,
+          app_secret: appSecret,
+          encryption_password: encryptionPassword,
+          org_id: orgId,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: "Facebook connected!",
+        description: `Successfully connected ${data.pages?.length || 0} page(s).`,
+      });
+
+      // Clear form
+      setShortLivedToken("");
+      setAppId("");
+      setAppSecret("");
+      setEncryptionPassword("");
+      setConfirmPassword("");
+      setShowSetup(false);
+
+      // Refresh pages
+      await fetchPages();
+    } catch (e) {
+      console.error("Facebook setup error:", e);
+      toast({ title: "Setup failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSetupLoading(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!orgId) return;
+    setLoading(true);
+    try {
+      // Delete credentials and pages for this org
+      await supabase.from("facebook_credentials").delete().eq("org_id", orgId);
+      await supabase.from("facebook_pages").delete().eq("org_id", orgId);
+      setConnected(false);
+      setPages([]);
+      toast({ title: "Disconnected", description: "Facebook integration removed." });
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Card>
@@ -54,29 +135,20 @@ export default function FacebookIntegrationCard() {
           <Badge
             variant="secondary"
             className={
-              tokenConfigured === true
+              connected === true
                 ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                : tokenConfigured === false
+                : connected === false
                 ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
                 : "bg-muted text-muted-foreground"
             }
           >
-            {tokenConfigured === true ? "Connected" : tokenConfigured === false ? "Not Configured" : "Checking…"}
+            {connected === true ? "Connected" : connected === false ? "Not Connected" : "Checking…"}
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {tokenConfigured === false && (
-          <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20 text-sm text-amber-800 dark:text-amber-300">
-            Your Facebook Page Access Token is not configured. Please contact your administrator to set it up in the backend secrets.
-          </div>
-        )}
-
-        {loading ? (
-          <div className="flex items-center justify-center py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : pages.length > 0 ? (
+        {/* Connected: Show pages */}
+        {connected === true && pages.length > 0 && (
           <div className="space-y-2">
             <p className="text-sm font-medium">Connected Pages</p>
             {pages.map((page) => (
@@ -84,22 +156,145 @@ export default function FacebookIntegrationCard() {
                 <div>
                   <p className="text-sm font-medium">{page.name}</p>
                   <p className="text-xs text-muted-foreground">ID: {page.id}</p>
-                  {page.category && (
-                    <p className="text-xs text-muted-foreground">{page.category}</p>
-                  )}
                 </div>
                 <Badge variant="outline" className="text-xs">Active</Badge>
               </div>
             ))}
           </div>
-        ) : tokenConfigured === true ? (
-          <p className="text-sm text-muted-foreground py-2">No Facebook Pages found for this token.</p>
-        ) : null}
+        )}
 
-        <Button variant="outline" size="sm" className="gap-2" onClick={fetchPages} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh Pages
-        </Button>
+        {connected === true && pages.length === 0 && (
+          <p className="text-sm text-muted-foreground py-2">Credentials stored but no pages found.</p>
+        )}
+
+        {/* Not connected: Show setup prompt or form */}
+        {connected === false && !showSetup && (
+          <div className="space-y-3">
+            <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20 text-sm text-amber-800 dark:text-amber-300">
+              Connect your Facebook App to start publishing. You'll need your App ID, App Secret, and a short-lived user token from the Meta Developer Dashboard.
+            </div>
+            <Button onClick={() => setShowSetup(true)} className="gap-2">
+              <Shield className="h-4 w-4" />
+              Connect Facebook
+            </Button>
+          </div>
+        )}
+
+        {/* Setup Form */}
+        {showSetup && (
+          <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
+            <p className="text-sm font-medium">Facebook App Setup</p>
+            <p className="text-xs text-muted-foreground">
+              All credentials will be encrypted with your password using AES-256-GCM before storage. 
+              Keep your encryption password safe — it's required for publishing.
+            </p>
+
+            <div className="space-y-2">
+              <Label htmlFor="fb-app-id">Facebook App ID</Label>
+              <Input
+                id="fb-app-id"
+                placeholder="Your Facebook App ID"
+                value={appId}
+                onChange={(e) => setAppId(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fb-app-secret">Facebook App Secret</Label>
+              <div className="relative">
+                <Input
+                  id="fb-app-secret"
+                  type={showSecret ? "text" : "password"}
+                  placeholder="Your Facebook App Secret"
+                  value={appSecret}
+                  onChange={(e) => setAppSecret(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowSecret(!showSecret)}
+                >
+                  {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fb-token">Short-Lived User Token</Label>
+              <div className="relative">
+                <Input
+                  id="fb-token"
+                  type={showToken ? "text" : "password"}
+                  placeholder="From Graph API Explorer or Login Flow"
+                  value={shortLivedToken}
+                  onChange={(e) => setShortLivedToken(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowToken(!showToken)}
+                >
+                  {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fb-enc-pass">Encryption Password</Label>
+              <div className="relative">
+                <Input
+                  id="fb-enc-pass"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Min 8 characters — keep this safe!"
+                  value={encryptionPassword}
+                  onChange={(e) => setEncryptionPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fb-enc-pass-confirm">Confirm Encryption Password</Label>
+              <Input
+                id="fb-enc-pass-confirm"
+                type="password"
+                placeholder="Re-enter encryption password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button onClick={handleSetup} disabled={setupLoading} className="gap-2">
+                {setupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+                {setupLoading ? "Connecting…" : "Connect & Encrypt"}
+              </Button>
+              <Button variant="outline" onClick={() => setShowSetup(false)} disabled={setupLoading}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={fetchPages} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          {connected === true && (
+            <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={handleDisconnect} disabled={loading}>
+              <Trash2 className="h-4 w-4" />
+              Disconnect
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

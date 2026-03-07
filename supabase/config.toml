@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.facebook-cron]
 verify_jwt = false
+
+[functions.facebook-setup]
+verify_jwt = false

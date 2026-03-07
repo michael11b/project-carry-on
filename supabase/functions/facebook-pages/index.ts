@@ -12,30 +12,42 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
   try {
-    const FACEBOOK_PAGE_ACCESS_TOKEN = Deno.env.get("FACEBOOK_PAGE_ACCESS_TOKEN");
-    if (!FACEBOOK_PAGE_ACCESS_TOKEN) {
-      throw new Error("Facebook Page Access Token is not configured.");
+    const body = await req.json().catch(() => ({}));
+    const orgId = body.org_id;
+
+    if (!orgId) {
+      throw new Error("org_id is required");
     }
 
-    // Fetch pages from Facebook Graph API
-    const fbRes = await fetch(
-      `https://graph.facebook.com/v21.0/me/accounts?access_token=${encodeURIComponent(FACEBOOK_PAGE_ACCESS_TOKEN)}`
-    );
-    const fbData = await fbRes.json();
+    // Read pages from DB instead of calling Facebook API
+    const { data: pages, error } = await supabase
+      .from("facebook_pages")
+      .select("page_id, page_name")
+      .eq("org_id", orgId);
 
-    if (fbData.error) {
-      throw new Error(`Facebook API error: ${fbData.error.message}`);
-    }
+    if (error) throw error;
 
-    const pages = (fbData.data || []).map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      access_token: p.access_token, // page-specific token
-      category: p.category,
-    }));
+    // Check if credentials exist for this org
+    const { data: creds } = await supabase
+      .from("facebook_credentials")
+      .select("id")
+      .eq("org_id", orgId)
+      .maybeSingle();
 
-    return new Response(JSON.stringify({ pages }), {
+    const connected = !!creds;
+
+    return new Response(JSON.stringify({
+      connected,
+      pages: (pages || []).map((p: any) => ({
+        id: p.page_id,
+        name: p.page_name,
+      })),
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {

@@ -357,7 +357,7 @@ export default function SettingsPage() {
 
         {/* ── Integrations ── */}
         <TabsContent value="integrations" className="space-y-4">
-          <FacebookIntegrationCard />
+          <FacebookIntegrationCard orgId={orgId ?? undefined} />
         </TabsContent>
       </Tabs>
     </div>
