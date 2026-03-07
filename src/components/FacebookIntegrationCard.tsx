@@ -114,11 +114,37 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
     }
   };
 
+  const handleRefresh = async () => {
+    if (!orgId) return;
+    if (!refreshPassword || refreshPassword.length < 8) {
+      toast({ title: "Password required", description: "Enter your encryption password (min 8 chars).", variant: "destructive" });
+      return;
+    }
+    setRefreshLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("facebook-refresh", {
+        body: { org_id: orgId, encryption_password: refreshPassword },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: data.token_refreshed ? "Tokens refreshed!" : "Pages refreshed!",
+        description: `${data.pages?.length || 0} page(s) updated.${data.token_refreshed ? " User token extended for 60 more days." : ""}`,
+      });
+      setRefreshPassword("");
+      setShowRefresh(false);
+      await fetchPages();
+    } catch (e) {
+      toast({ title: "Refresh failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setRefreshLoading(false);
+    }
+  };
+
   const handleDisconnect = async () => {
     if (!orgId) return;
     setLoading(true);
     try {
-      // Delete credentials and pages for this org
       await supabase.from("facebook_credentials").delete().eq("org_id", orgId);
       await supabase.from("facebook_pages").delete().eq("org_id", orgId);
       setConnected(false);
