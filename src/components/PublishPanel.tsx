@@ -124,6 +124,20 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // If mediaUrl is a base64 data URL, upload to storage first
+      let resolvedMediaUrl = mediaUrl || null;
+      if (mediaUrl && mediaUrl.startsWith("data:")) {
+        const blob = await fetch(mediaUrl).then((r) => r.blob());
+        const ext = mediaUrl.includes("image/png") ? "png" : "jpg";
+        const filePath = `${orgId}/${crypto.randomUUID()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from("post-media")
+          .upload(filePath, blob, { contentType: blob.type, upsert: false });
+        if (uploadErr) throw new Error(`Upload failed: ${uploadErr.message}`);
+        const { data: urlData } = supabase.storage.from("post-media").getPublicUrl(filePath);
+        resolvedMediaUrl = urlData.publicUrl;
+      }
+
       if (scheduleMode && scheduleDate) {
         // Create a scheduled post
         const [hours, mins] = scheduleTime.split(":").map(Number);
