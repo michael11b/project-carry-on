@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, RefreshCw, Trash2, Shield, Eye, EyeOff, AlertTriangle, Clock } from "lucide-react";
+import { Loader2, RefreshCw, Trash2, Shield, Eye, EyeOff, AlertTriangle, Clock, Instagram } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -13,9 +13,16 @@ interface FacebookPage {
   name: string;
 }
 
+interface InstagramAccount {
+  ig_user_id: string;
+  ig_username: string;
+  facebook_page_id: string;
+}
+
 export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
   const { toast } = useToast();
   const [pages, setPages] = useState<FacebookPage[]>([]);
+  const [igAccounts, setIgAccounts] = useState<InstagramAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [setupLoading, setSetupLoading] = useState(false);
   const [connected, setConnected] = useState<boolean | null>(null);
@@ -47,6 +54,7 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
       if (data?.error) throw new Error(data.error);
       setConnected(data?.connected ?? false);
       setPages(data?.pages || []);
+      setIgAccounts(data?.instagram_accounts || []);
       setDaysUntilExpiry(data?.days_until_expiry ?? null);
       setTokenExchangedAt(data?.token_exchanged_at ?? null);
     } catch (e) {
@@ -147,9 +155,11 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
     try {
       await supabase.from("facebook_credentials").delete().eq("org_id", orgId);
       await supabase.from("facebook_pages").delete().eq("org_id", orgId);
+      await supabase.from("instagram_accounts").delete().eq("org_id", orgId);
       setConnected(false);
       setPages([]);
-      toast({ title: "Disconnected", description: "Facebook integration removed." });
+      setIgAccounts([]);
+      toast({ title: "Disconnected", description: "Facebook & Instagram integration removed." });
     } catch (e) {
       toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -162,8 +172,8 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="font-display text-lg">Facebook Integration</CardTitle>
-            <CardDescription>Connect your Facebook Pages to publish content directly.</CardDescription>
+            <CardTitle className="font-display text-lg">Facebook & Instagram</CardTitle>
+            <CardDescription>Connect your Facebook Pages and linked Instagram accounts to publish content directly.</CardDescription>
           </div>
           <Badge
             variant="secondary"
@@ -196,8 +206,26 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
           </div>
         )}
 
-        {connected === true && pages.length === 0 && (
-          <p className="text-sm text-muted-foreground py-2">Credentials stored but no pages found.</p>
+        {/* Instagram accounts */}
+        {connected === true && igAccounts.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium flex items-center gap-1.5">
+              <Instagram className="h-4 w-4" /> Linked Instagram Accounts
+            </p>
+            {igAccounts.map((ig) => (
+              <div key={ig.ig_user_id} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                <div>
+                  <p className="text-sm font-medium">@{ig.ig_username || ig.ig_user_id}</p>
+                  <p className="text-xs text-muted-foreground">ID: {ig.ig_user_id}</p>
+                </div>
+                <Badge variant="outline" className="text-xs">Active</Badge>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {connected === true && pages.length === 0 && igAccounts.length === 0 && (
+          <p className="text-sm text-muted-foreground py-2">Credentials stored but no pages or accounts found.</p>
         )}
 
         {/* Token expiry warning */}

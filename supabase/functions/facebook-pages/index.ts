@@ -24,11 +24,21 @@ serve(async (req) => {
       throw new Error("org_id is required");
     }
 
-    // Read pages from DB instead of calling Facebook API
+    // Read pages from DB
     const { data: pages, error } = await supabase
       .from("facebook_pages")
       .select("page_id, page_name")
       .eq("org_id", orgId);
+
+    if (error) throw error;
+
+    // Read Instagram accounts from DB
+    const { data: igAccounts, error: igError } = await supabase
+      .from("instagram_accounts")
+      .select("ig_user_id, ig_username, facebook_page_id")
+      .eq("org_id", orgId);
+
+    if (igError) throw igError;
 
     if (error) throw error;
 
@@ -56,6 +66,11 @@ serve(async (req) => {
       pages: (pages || []).map((p: any) => ({
         id: p.page_id,
         name: p.page_name,
+      })),
+      instagram_accounts: (igAccounts || []).map((ig: any) => ({
+        ig_user_id: ig.ig_user_id,
+        ig_username: ig.ig_username,
+        facebook_page_id: ig.facebook_page_id,
       })),
       token_exchanged_at: tokenExchangedAt,
       days_until_expiry: daysUntilExpiry,

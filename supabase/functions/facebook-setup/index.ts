@@ -149,9 +149,48 @@ serve(async (req) => {
       pageResults.push({ id: page.id, name: page.name, category: page.category });
     }
 
+    // Step 6: Discover Instagram Business accounts linked to each page
+    const igResults: Array<{ ig_user_id: string; ig_username: string; facebook_page_id: string }> = [];
+
+    for (const page of pages) {
+      try {
+        const igRes = await fetch(
+          `https://graph.facebook.com/v22.0/${page.id}?fields=instagram_business_account{id,username}&access_token=${encodeURIComponent(page.access_token)}`
+        );
+        const igData = await igRes.json();
+        const igAccount = igData?.instagram_business_account;
+        if (igAccount?.id) {
+          // Delete existing and insert fresh
+          await supabase
+            .from("instagram_accounts")
+            .delete()
+            .eq("org_id", org_id)
+            .eq("ig_user_id", igAccount.id);
+
+          await supabase
+            .from("instagram_accounts")
+            .insert({
+              org_id,
+              facebook_page_id: page.id,
+              ig_user_id: igAccount.id,
+              ig_username: igAccount.username || null,
+            });
+
+          igResults.push({
+            ig_user_id: igAccount.id,
+            ig_username: igAccount.username || "",
+            facebook_page_id: page.id,
+          });
+        }
+      } catch (e) {
+        console.error(`Failed to fetch IG account for page ${page.id}:`, e);
+      }
+    }
+
     return new Response(JSON.stringify({
       success: true,
       pages: pageResults,
+      instagram_accounts: igResults,
       token_expires_in: exchangeData.expires_in || "never (page tokens are permanent)",
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

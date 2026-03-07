@@ -197,6 +197,41 @@ export type Database = {
           },
         ]
       }
+      instagram_accounts: {
+        Row: {
+          created_at: string
+          facebook_page_id: string
+          id: string
+          ig_user_id: string
+          ig_username: string | null
+          org_id: string
+        }
+        Insert: {
+          created_at?: string
+          facebook_page_id: string
+          id?: string
+          ig_user_id: string
+          ig_username?: string | null
+          org_id: string
+        }
+        Update: {
+          created_at?: string
+          facebook_page_id?: string
+          id?: string
+          ig_user_id?: string
+          ig_username?: string | null
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_accounts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -279,6 +314,7 @@ export type Database = {
           created_by: string
           facebook_page_id: string | null
           id: string
+          instagram_account_id: string | null
           media_url: string | null
           org_id: string
           post_type: string
@@ -296,6 +332,7 @@ export type Database = {
           created_by: string
           facebook_page_id?: string | null
           id?: string
+          instagram_account_id?: string | null
           media_url?: string | null
           org_id: string
           post_type?: string
@@ -313,6 +350,7 @@ export type Database = {
           created_by?: string
           facebook_page_id?: string | null
           id?: string
+          instagram_account_id?: string | null
           media_url?: string | null
           org_id?: string
           post_type?: string

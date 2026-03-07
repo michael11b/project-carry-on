@@ -36,6 +36,7 @@ interface ScheduledPost {
   scheduled_at: string;
   created_at: string;
   facebook_page_id?: string | null;
+  instagram_account_id?: string | null;
   media_url?: string | null;
   post_type?: string | null;
   published_fb_id?: string | null;
@@ -46,6 +47,12 @@ interface FacebookPage {
   id: string;
   name: string;
   category?: string;
+}
+
+interface InstagramAccount {
+  ig_user_id: string;
+  ig_username: string;
+  facebook_page_id: string;
 }
 
 const CHANNELS = [
@@ -62,6 +69,11 @@ const POST_TYPES = [
   { value: "text", label: "Text" },
   { value: "image", label: "Image" },
   { value: "video", label: "Video" },
+  { value: "reel", label: "Reel" },
+];
+
+const IG_POST_TYPES = [
+  { value: "image", label: "Image" },
   { value: "reel", label: "Reel" },
 ];
 
@@ -104,8 +116,10 @@ export default function ContentCalendar() {
   // Facebook-specific form state
   const [formPostType, setFormPostType] = useState("text");
   const [formFbPageId, setFormFbPageId] = useState("");
+  const [formIgAccountId, setFormIgAccountId] = useState("");
   const [formMediaUrl, setFormMediaUrl] = useState("");
   const [fbPages, setFbPages] = useState<FacebookPage[]>([]);
+  const [igAccounts, setIgAccounts] = useState<InstagramAccount[]>([]);
   const [loadingPages, setLoadingPages] = useState(false);
   const [publishing, setPublishing] = useState<string | null>(null);
 
@@ -150,16 +164,18 @@ export default function ContentCalendar() {
       const { data, error } = await supabase.functions.invoke("facebook-pages");
       if (error) throw error;
       setFbPages(data?.pages || []);
+      setIgAccounts(data?.instagram_accounts || []);
     } catch (e) {
       console.error("Failed to fetch FB pages:", e);
       setFbPages([]);
+      setIgAccounts([]);
     } finally {
       setLoadingPages(false);
     }
   }, []);
 
   useEffect(() => {
-    if (formChannel === "facebook" && dialogOpen) {
+    if ((formChannel === "facebook" || formChannel === "instagram") && dialogOpen) {
       fetchFbPages();
     }
   }, [formChannel, dialogOpen, fetchFbPages]);
@@ -192,6 +208,7 @@ export default function ContentCalendar() {
     setFormTime("09:00");
     setFormPostType("text");
     setFormFbPageId("");
+    setFormIgAccountId("");
     setFormMediaUrl("");
     setDialogOpen(true);
   };
@@ -207,6 +224,7 @@ export default function ContentCalendar() {
     setFormTime(format(d, "HH:mm"));
     setFormPostType(post.post_type || "text");
     setFormFbPageId(post.facebook_page_id || "");
+    setFormIgAccountId(post.instagram_account_id || "");
     setFormMediaUrl(post.media_url || "");
     setDialogOpen(true);
   };
@@ -219,17 +237,28 @@ export default function ContentCalendar() {
     const scheduledAt = new Date(formDate);
     scheduledAt.setHours(hours, mins, 0, 0);
 
-    const fbFields = formChannel === "facebook"
-      ? {
-          facebook_page_id: formFbPageId || null,
-          post_type: formPostType,
-          media_url: formMediaUrl || null,
-        }
-      : {
-          facebook_page_id: null,
-          post_type: "text",
-          media_url: null,
-        };
+    let channelFields: Record<string, any> = {
+      facebook_page_id: null,
+      instagram_account_id: null,
+      post_type: "text",
+      media_url: null,
+    };
+
+    if (formChannel === "facebook") {
+      channelFields = {
+        facebook_page_id: formFbPageId || null,
+        instagram_account_id: null,
+        post_type: formPostType,
+        media_url: formMediaUrl || null,
+      };
+    } else if (formChannel === "instagram") {
+      channelFields = {
+        facebook_page_id: null,
+        instagram_account_id: formIgAccountId || null,
+        post_type: formPostType || "image",
+        media_url: formMediaUrl || null,
+      };
+    }
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -245,7 +274,7 @@ export default function ContentCalendar() {
             status: formStatus,
             scheduled_at: scheduledAt.toISOString(),
             updated_at: new Date().toISOString(),
-            ...fbFields,
+            ...channelFields,
           })
           .eq("id", editingPost.id);
         if (error) throw error;
@@ -261,7 +290,7 @@ export default function ContentCalendar() {
             channel: formChannel,
             status: formStatus,
             scheduled_at: scheduledAt.toISOString(),
-            ...fbFields,
+            ...channelFields,
           });
         if (error) throw error;
         toast({ title: "Post created" });
@@ -305,6 +334,31 @@ export default function ContentCalendar() {
       }
       if (data?.error) throw new Error(data.error);
       toast({ title: "Published to Facebook!", description: `Post ID: ${data?.fb_id}` });
+      fetchPosts();
+    } catch (e) {
+      toast({ title: "Publish failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setPublishing(null);
+    }
+  };
+
+  const handlePublishInstagram = async (post: ScheduledPost) => {
+    if (publishing) return;
+    setPublishing(post.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("instagram-publish", {
+        body: { post_id: post.id },
+      });
+      if (error) {
+        let msg = error.message;
+        try {
+          const ctx = typeof error.context === "string" ? JSON.parse(error.context) : error.context;
+          if (ctx?.error) msg = ctx.error;
+        } catch {}
+        throw new Error(msg);
+      }
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Published to Instagram!", description: `Post ID: ${data?.ig_id}` });
       fetchPosts();
     } catch (e) {
       toast({ title: "Publish failed", description: (e as Error).message, variant: "destructive" });
@@ -468,14 +522,14 @@ export default function ContentCalendar() {
                       {post.content && (
                         <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{post.content}</p>
                       )}
-                      {/* Facebook publish status */}
-                      {post.channel === "facebook" && post.published_fb_id && (
+                      {/* Facebook/Instagram publish status */}
+                      {(post.channel === "facebook" || post.channel === "instagram") && post.published_fb_id && (
                         <div className="flex items-center gap-1 text-[10px] text-green-600 mt-1">
                           <CheckCircle2 className="h-3 w-3" />
                           Published (ID: {post.published_fb_id.substring(0, 20)}…)
                         </div>
                       )}
-                      {post.channel === "facebook" && post.publish_error && !post.published_fb_id && (
+                      {(post.channel === "facebook" || post.channel === "instagram") && post.publish_error && !post.published_fb_id && (
                         <div className="flex items-center gap-1 text-[10px] text-destructive mt-1">
                           <AlertCircle className="h-3 w-3" />
                           {post.publish_error}
@@ -492,6 +546,23 @@ export default function ContentCalendar() {
                           onClick={() => handlePublishNow(post)}
                           disabled={publishing === post.id}
                           title="Publish now to Facebook"
+                        >
+                          {publishing === post.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      )}
+                      {/* Publish Now for Instagram posts */}
+                      {post.channel === "instagram" && !post.published_fb_id && post.instagram_account_id && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-pink-600 hover:text-pink-700"
+                          onClick={() => handlePublishInstagram(post)}
+                          disabled={publishing === post.id}
+                          title="Publish now to Instagram"
                         >
                           {publishing === post.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -623,6 +694,60 @@ export default function ContentCalendar() {
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Instagram-specific fields */}
+            {formChannel === "instagram" && (
+              <div className="space-y-4 p-3 rounded-lg border border-pink-200 bg-pink-50/50 dark:border-pink-800 dark:bg-pink-950/20">
+                <p className="text-xs font-medium text-pink-700 dark:text-pink-400">Instagram Settings</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Instagram Account</Label>
+                    <Select value={formIgAccountId} onValueChange={setFormIgAccountId} disabled={saving || loadingPages}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingPages ? "Loading…" : "Select account"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {igAccounts.map((ig) => (
+                          <SelectItem key={ig.ig_user_id} value={ig.ig_user_id}>
+                            @{ig.ig_username || ig.ig_user_id}
+                          </SelectItem>
+                        ))}
+                        {!loadingPages && igAccounts.length === 0 && (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                            No Instagram accounts found. Link one via Facebook setup.
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Post Type</Label>
+                    <Select value={formPostType === "text" ? "image" : formPostType} onValueChange={setFormPostType} disabled={saving}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {IG_POST_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Media URL</Label>
+                  <Input
+                    placeholder={formPostType === "reel" ? "https://example.com/video.mp4" : "https://example.com/photo.jpg"}
+                    value={formMediaUrl}
+                    onChange={(e) => setFormMediaUrl(e.target.value)}
+                    disabled={saving}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Instagram requires a publicly accessible media URL for all posts.
+                  </p>
+                </div>
               </div>
             )}
 
