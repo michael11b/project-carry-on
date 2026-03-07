@@ -172,8 +172,8 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="font-display text-lg">Facebook Integration</CardTitle>
-            <CardDescription>Connect your Facebook Pages to publish content directly.</CardDescription>
+            <CardTitle className="font-display text-lg">Facebook & Instagram</CardTitle>
+            <CardDescription>Connect your Facebook Pages and linked Instagram accounts to publish content directly.</CardDescription>
           </div>
           <Badge
             variant="secondary"
