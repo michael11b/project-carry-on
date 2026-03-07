@@ -74,6 +74,10 @@ export default function Studio() {
   const [savingText, setSavingText] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
 
+  // Page profile state
+  const [pageProfiles, setPageProfiles] = useState<PageProfile[]>([]);
+  const [selectedPageProfileId, setSelectedPageProfileId] = useState<string>("");
+
   // Image tab state
   const [imagePrompt, setImagePrompt] = useState("");
   const [imagePlatform, setImagePlatform] = useState<string>("");
@@ -84,9 +88,9 @@ export default function Studio() {
   const [usedImagePlatform, setUsedImagePlatform] = useState<string>("");
   const [usedImageBrand, setUsedImageBrand] = useState<string>("");
 
-  // Fetch brands for the current user's org
+  // Fetch brands and page profiles for the current user's org
   useEffect(() => {
-    async function fetchBrands() {
+    async function fetchData() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -104,8 +108,16 @@ export default function Studio() {
         .in("org_id", orgIds);
 
       if (data) setBrands(data);
+
+      // Fetch page profiles
+      const { data: profiles } = await supabase
+        .from("page_profiles")
+        .select("*")
+        .in("org_id", orgIds);
+
+      if (profiles) setPageProfiles(profiles as unknown as PageProfile[]);
     }
-    fetchBrands();
+    fetchData();
   }, []);
 
   const handleGenerate = useCallback(async () => {
