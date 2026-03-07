@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save } from "lucide-react";
+import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save, Facebook } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,19 @@ import PublishPanel from "@/components/PublishPanel";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Brand = Tables<"brands">;
+
+interface PageProfile {
+  id: string;
+  facebook_page_id: string;
+  page_name: string;
+  description: string;
+  target_audience: string;
+  content_tone: string;
+  content_topics: string[];
+  posting_goals: string;
+  hashtag_preferences: string;
+  system_prompt: string;
+}
 
 const CHANNELS = [
   { value: "instagram", label: "Instagram" },
