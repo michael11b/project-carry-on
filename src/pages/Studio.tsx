@@ -381,6 +381,11 @@ export default function Studio() {
                         {isStreaming && <span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom rounded-sm" />}
                       </div>
                     </ScrollArea>
+                    <PublishPanel
+                      content={output}
+                      defaultTitle={prompt.trim().slice(0, 80)}
+                      hasContent={!!output && !isStreaming}
+                    />
                   </>
                 ) : (
                   <div className="flex-1 flex items-center justify-center text-muted-foreground">
