@@ -173,7 +173,7 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
           facebook_page_id: channel === "facebook" ? selectedPageId : null,
           instagram_account_id: channel === "instagram" ? selectedIgId : null,
           post_type: postType,
-          media_url: mediaUrl || null,
+          media_url: resolvedMediaUrl,
         }).select("id").single();
         if (insertErr || !newPost) throw insertErr || new Error("Failed to create post");
 
