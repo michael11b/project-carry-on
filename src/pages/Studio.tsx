@@ -276,8 +276,28 @@ export default function Studio() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-display font-bold tracking-tight">Content Studio</h1>
-        <p className="text-muted-foreground mt-1">Generate multi-modal content powered by AI.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-display font-bold tracking-tight">Content Studio</h1>
+            <p className="text-muted-foreground mt-1">Generate multi-modal content powered by AI.</p>
+          </div>
+          {pageProfiles.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Facebook className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedPageProfileId} onValueChange={setSelectedPageProfileId}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="No page selected" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No page (general)</SelectItem>
+                  {pageProfiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.page_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
       </motion.div>
 
       <Tabs defaultValue="text" className="space-y-4">
