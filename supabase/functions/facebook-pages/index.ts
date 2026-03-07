@@ -32,14 +32,24 @@ serve(async (req) => {
 
     if (error) throw error;
 
-    // Check if credentials exist for this org
+    // Check if credentials exist for this org and get token age
     const { data: creds } = await supabase
       .from("facebook_credentials")
-      .select("id")
+      .select("id, updated_at")
       .eq("org_id", orgId)
       .maybeSingle();
 
     const connected = !!creds;
+
+    // Calculate days until token expiry (60 days from exchange)
+    let tokenExchangedAt: string | null = null;
+    let daysUntilExpiry: number | null = null;
+    if (creds?.updated_at) {
+      tokenExchangedAt = creds.updated_at;
+      const exchangeDate = new Date(creds.updated_at);
+      const expiryDate = new Date(exchangeDate.getTime() + 60 * 24 * 60 * 60 * 1000);
+      daysUntilExpiry = Math.ceil((expiryDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+    }
 
     return new Response(JSON.stringify({
       connected,
@@ -47,6 +57,8 @@ serve(async (req) => {
         id: p.page_id,
         name: p.page_name,
       })),
+      token_exchanged_at: tokenExchangedAt,
+      days_until_expiry: daysUntilExpiry,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, RefreshCw, Trash2, Shield, Eye, EyeOff } from "lucide-react";
+import { Loader2, RefreshCw, Trash2, Shield, Eye, EyeOff, AlertTriangle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,6 +19,8 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
   const [loading, setLoading] = useState(false);
   const [setupLoading, setSetupLoading] = useState(false);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [daysUntilExpiry, setDaysUntilExpiry] = useState<number | null>(null);
+  const [tokenExchangedAt, setTokenExchangedAt] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
 
   // Setup form fields
@@ -42,6 +44,8 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
       if (data?.error) throw new Error(data.error);
       setConnected(data?.connected ?? false);
       setPages(data?.pages || []);
+      setDaysUntilExpiry(data?.days_until_expiry ?? null);
+      setTokenExchangedAt(data?.token_exchanged_at ?? null);
     } catch (e) {
       console.error("Failed to fetch FB pages:", e);
       toast({ title: "Failed to load pages", description: (e as Error).message, variant: "destructive" });
@@ -165,6 +169,50 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
 
         {connected === true && pages.length === 0 && (
           <p className="text-sm text-muted-foreground py-2">Credentials stored but no pages found.</p>
+        )}
+
+        {/* Token expiry warning */}
+        {connected === true && daysUntilExpiry !== null && (
+          daysUntilExpiry <= 0 ? (
+            <div className="flex items-start gap-3 p-3 rounded-lg border border-destructive/50 bg-destructive/10 text-sm">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-destructive">User token expired!</p>
+                <p className="text-muted-foreground text-xs mt-1">
+                  Your long-lived user token has expired. Page tokens may still work, but you should reconnect to refresh everything.
+                </p>
+                <Button size="sm" variant="destructive" className="mt-2 gap-2" onClick={() => setShowSetup(true)}>
+                  <Shield className="h-3.5 w-3.5" /> Reconnect Now
+                </Button>
+              </div>
+            </div>
+          ) : daysUntilExpiry <= 14 ? (
+            <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20 text-sm">
+              <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-amber-800 dark:text-amber-300">
+                  Token expires in {daysUntilExpiry} day{daysUntilExpiry !== 1 ? "s" : ""}
+                </p>
+                <p className="text-muted-foreground text-xs mt-1">
+                  Your long-lived user token will expire soon. Reconnect to refresh it.
+                  {tokenExchangedAt && (
+                    <span> Last exchanged: {new Date(tokenExchangedAt).toLocaleDateString()}</span>
+                  )}
+                </p>
+                <Button size="sm" variant="outline" className="mt-2 gap-2" onClick={() => setShowSetup(true)}>
+                  <RefreshCw className="h-3.5 w-3.5" /> Refresh Token
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" />
+              Token valid for {daysUntilExpiry} more days
+              {tokenExchangedAt && (
+                <span>· Exchanged {new Date(tokenExchangedAt).toLocaleDateString()}</span>
+              )}
+            </p>
+          )
         )}
 
         {/* Not connected: Show setup prompt or form */}
