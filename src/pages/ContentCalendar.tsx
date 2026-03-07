@@ -175,7 +175,7 @@ export default function ContentCalendar() {
     } finally {
       setLoadingPages(false);
     }
-  }, []);
+  }, [orgId]);
 
   useEffect(() => {
     if ((formChannel === "facebook" || formChannel === "instagram") && dialogOpen) {
