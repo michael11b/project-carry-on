@@ -48,6 +48,12 @@ interface FacebookPage {
   category?: string;
 }
 
+interface InstagramAccount {
+  ig_user_id: string;
+  ig_username: string;
+  facebook_page_id: string;
+}
+
 const CHANNELS = [
   { value: "facebook", label: "Facebook" },
   { value: "instagram", label: "Instagram" },
