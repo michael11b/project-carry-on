@@ -190,6 +190,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       pages: pageResults,
+      instagram_accounts: igResults,
       token_expires_in: exchangeData.expires_in || "never (page tokens are permanent)",
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
