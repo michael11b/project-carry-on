@@ -290,7 +290,7 @@ export default function ContentCalendar() {
             channel: formChannel,
             status: formStatus,
             scheduled_at: scheduledAt.toISOString(),
-            ...fbFields,
+            ...channelFields,
           });
         if (error) throw error;
         toast({ title: "Post created" });
