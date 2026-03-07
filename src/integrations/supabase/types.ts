@@ -285,6 +285,62 @@ export type Database = {
         }
         Relationships: []
       }
+      page_profiles: {
+        Row: {
+          content_tone: string
+          content_topics: string[]
+          created_at: string
+          description: string
+          facebook_page_id: string
+          hashtag_preferences: string
+          id: string
+          org_id: string
+          page_name: string
+          posting_goals: string
+          system_prompt: string
+          target_audience: string
+          updated_at: string
+        }
+        Insert: {
+          content_tone?: string
+          content_topics?: string[]
+          created_at?: string
+          description?: string
+          facebook_page_id: string
+          hashtag_preferences?: string
+          id?: string
+          org_id: string
+          page_name?: string
+          posting_goals?: string
+          system_prompt?: string
+          target_audience?: string
+          updated_at?: string
+        }
+        Update: {
+          content_tone?: string
+          content_topics?: string[]
+          created_at?: string
+          description?: string
+          facebook_page_id?: string
+          hashtag_preferences?: string
+          id?: string
+          org_id?: string
+          page_name?: string
+          posting_goals?: string
+          system_prompt?: string
+          target_audience?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
