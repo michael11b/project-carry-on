@@ -17,6 +17,7 @@ import AssetLibrary from "@/pages/AssetLibrary";
 import ContentCalendar from "@/pages/ContentCalendar";
 import TeamManagement from "@/pages/TeamManagement";
 import SettingsPage from "@/pages/SettingsPage";
+import PagesConfig from "@/pages/PagesConfig";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
