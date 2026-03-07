@@ -359,12 +359,47 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
           </div>
         )}
 
+        {/* Refresh Tokens prompt */}
+        {connected === true && showRefresh && (
+          <div className="space-y-3 p-4 rounded-lg border border-border bg-muted/30">
+            <p className="text-sm font-medium">Refresh Tokens</p>
+            <p className="text-xs text-muted-foreground">
+              Enter your encryption password to re-fetch page tokens from Facebook and extend your user token.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="fb-refresh-pass">Encryption Password</Label>
+              <Input
+                id="fb-refresh-pass"
+                type="password"
+                placeholder="Your encryption password"
+                value={refreshPassword}
+                onChange={(e) => setRefreshPassword(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleRefresh} disabled={refreshLoading} size="sm" className="gap-2">
+                {refreshLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                {refreshLoading ? "Refreshing…" : "Refresh Tokens"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setShowRefresh(false); setRefreshPassword(""); }} disabled={refreshLoading}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="gap-2" onClick={fetchPages} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            Refresh List
           </Button>
+          {connected === true && !showRefresh && (
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowRefresh(true)} disabled={loading}>
+              <Shield className="h-4 w-4" />
+              Refresh Tokens
+            </Button>
+          )}
           {connected === true && (
             <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={handleDisconnect} disabled={loading}>
               <Trash2 className="h-4 w-4" />
