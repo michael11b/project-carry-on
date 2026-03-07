@@ -19,6 +19,8 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
   const [loading, setLoading] = useState(false);
   const [setupLoading, setSetupLoading] = useState(false);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [daysUntilExpiry, setDaysUntilExpiry] = useState<number | null>(null);
+  const [tokenExchangedAt, setTokenExchangedAt] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
 
   // Setup form fields
