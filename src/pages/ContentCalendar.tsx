@@ -159,9 +159,12 @@ export default function ContentCalendar() {
 
   // Fetch Facebook pages when channel is facebook
   const fetchFbPages = useCallback(async () => {
+    if (!orgId) return;
     setLoadingPages(true);
     try {
-      const { data, error } = await supabase.functions.invoke("facebook-pages");
+      const { data, error } = await supabase.functions.invoke("facebook-pages", {
+        body: { org_id: orgId },
+      });
       if (error) throw error;
       setFbPages(data?.pages || []);
       setIgAccounts(data?.instagram_accounts || []);
