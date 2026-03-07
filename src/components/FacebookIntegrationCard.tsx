@@ -44,6 +44,8 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
       if (data?.error) throw new Error(data.error);
       setConnected(data?.connected ?? false);
       setPages(data?.pages || []);
+      setDaysUntilExpiry(data?.days_until_expiry ?? null);
+      setTokenExchangedAt(data?.token_exchanged_at ?? null);
     } catch (e) {
       console.error("Failed to fetch FB pages:", e);
       toast({ title: "Failed to load pages", description: (e as Error).message, variant: "destructive" });
