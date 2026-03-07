@@ -141,8 +141,15 @@ export default function Studio() {
         }
       : undefined;
 
+    // Build prompt with page profile context
+    const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
+    let fullPrompt = prompt.trim();
+    if (selectedPage?.system_prompt) {
+      fullPrompt = `${selectedPage.system_prompt}\n\n---\nUser request: ${fullPrompt}`;
+    }
+
     await streamGenerate({
-      prompt: prompt.trim(),
+      prompt: fullPrompt,
       brandVoice,
       channel: channel || undefined,
       variantCount: parseInt(variantCount),
