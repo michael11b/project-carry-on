@@ -22,6 +22,8 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
   const [daysUntilExpiry, setDaysUntilExpiry] = useState<number | null>(null);
   const [tokenExchangedAt, setTokenExchangedAt] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
+  const [showRefresh, setShowRefresh] = useState(false);
+  const [refreshLoading, setRefreshLoading] = useState(false);
 
   // Setup form fields
   const [shortLivedToken, setShortLivedToken] = useState("");
@@ -29,6 +31,7 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
   const [appSecret, setAppSecret] = useState("");
   const [encryptionPassword, setEncryptionPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [refreshPassword, setRefreshPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
