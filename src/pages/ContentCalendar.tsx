@@ -237,17 +237,28 @@ export default function ContentCalendar() {
     const scheduledAt = new Date(formDate);
     scheduledAt.setHours(hours, mins, 0, 0);
 
-    const fbFields = formChannel === "facebook"
-      ? {
-          facebook_page_id: formFbPageId || null,
-          post_type: formPostType,
-          media_url: formMediaUrl || null,
-        }
-      : {
-          facebook_page_id: null,
-          post_type: "text",
-          media_url: null,
-        };
+    let channelFields: Record<string, any> = {
+      facebook_page_id: null,
+      instagram_account_id: null,
+      post_type: "text",
+      media_url: null,
+    };
+
+    if (formChannel === "facebook") {
+      channelFields = {
+        facebook_page_id: formFbPageId || null,
+        instagram_account_id: null,
+        post_type: formPostType,
+        media_url: formMediaUrl || null,
+      };
+    } else if (formChannel === "instagram") {
+      channelFields = {
+        facebook_page_id: null,
+        instagram_account_id: formIgAccountId || null,
+        post_type: formPostType || "image",
+        media_url: formMediaUrl || null,
+      };
+    }
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
