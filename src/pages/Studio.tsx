@@ -513,6 +513,12 @@ export default function Studio() {
                     {imageDescription && (
                       <p className="text-sm text-muted-foreground mt-3">{imageDescription}</p>
                     )}
+                    <PublishPanel
+                      content={imageDescription || imagePrompt}
+                      mediaUrl={imageUrl}
+                      defaultTitle={imagePrompt.trim().slice(0, 80)}
+                      hasContent={!!imageUrl}
+                    />
                   </>
                 ) : (
                   <div className="flex-1 flex items-center justify-center text-muted-foreground">
