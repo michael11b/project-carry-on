@@ -115,8 +115,10 @@ export default function ContentCalendar() {
   // Facebook-specific form state
   const [formPostType, setFormPostType] = useState("text");
   const [formFbPageId, setFormFbPageId] = useState("");
+  const [formIgAccountId, setFormIgAccountId] = useState("");
   const [formMediaUrl, setFormMediaUrl] = useState("");
   const [fbPages, setFbPages] = useState<FacebookPage[]>([]);
+  const [igAccounts, setIgAccounts] = useState<InstagramAccount[]>([]);
   const [loadingPages, setLoadingPages] = useState(false);
   const [publishing, setPublishing] = useState<string | null>(null);
 
