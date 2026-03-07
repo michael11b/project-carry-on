@@ -14,10 +14,17 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const encryptionPassword = Deno.env.get("FB_ENCRYPTION_PASSWORD");
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+  if (!encryptionPassword) {
+    return new Response(JSON.stringify({ error: "FB_ENCRYPTION_PASSWORD secret not configured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
-    // Find all scheduled Facebook posts that are due
     const { data: posts, error } = await supabase
       .from("scheduled_posts")
       .select("id")
@@ -37,14 +44,13 @@ serve(async (req) => {
 
     for (const post of posts) {
       try {
-        // Call the facebook-publish function for each post
         const publishRes = await fetch(`${supabaseUrl}/functions/v1/facebook-publish`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${serviceRoleKey}`,
           },
-          body: JSON.stringify({ post_id: post.id }),
+          body: JSON.stringify({ post_id: post.id, encryption_password: encryptionPassword }),
         });
         const publishData = await publishRes.json();
         results.push({ post_id: post.id, ...publishData });
