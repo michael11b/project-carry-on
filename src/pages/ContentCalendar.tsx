@@ -207,6 +207,7 @@ export default function ContentCalendar() {
     setFormTime("09:00");
     setFormPostType("text");
     setFormFbPageId("");
+    setFormIgAccountId("");
     setFormMediaUrl("");
     setDialogOpen(true);
   };
