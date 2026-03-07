@@ -497,14 +497,14 @@ export default function ContentCalendar() {
                       {post.content && (
                         <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{post.content}</p>
                       )}
-                      {/* Facebook publish status */}
-                      {post.channel === "facebook" && post.published_fb_id && (
+                      {/* Facebook/Instagram publish status */}
+                      {(post.channel === "facebook" || post.channel === "instagram") && post.published_fb_id && (
                         <div className="flex items-center gap-1 text-[10px] text-green-600 mt-1">
                           <CheckCircle2 className="h-3 w-3" />
                           Published (ID: {post.published_fb_id.substring(0, 20)}…)
                         </div>
                       )}
-                      {post.channel === "facebook" && post.publish_error && !post.published_fb_id && (
+                      {(post.channel === "facebook" || post.channel === "instagram") && post.publish_error && !post.published_fb_id && (
                         <div className="flex items-center gap-1 text-[10px] text-destructive mt-1">
                           <AlertCircle className="h-3 w-3" />
                           {post.publish_error}
