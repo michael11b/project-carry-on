@@ -54,6 +54,7 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
       if (data?.error) throw new Error(data.error);
       setConnected(data?.connected ?? false);
       setPages(data?.pages || []);
+      setIgAccounts(data?.instagram_accounts || []);
       setDaysUntilExpiry(data?.days_until_expiry ?? null);
       setTokenExchangedAt(data?.token_exchanged_at ?? null);
     } catch (e) {
