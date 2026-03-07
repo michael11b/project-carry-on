@@ -155,9 +155,11 @@ export default function FacebookIntegrationCard({ orgId }: { orgId?: string }) {
     try {
       await supabase.from("facebook_credentials").delete().eq("org_id", orgId);
       await supabase.from("facebook_pages").delete().eq("org_id", orgId);
+      await supabase.from("instagram_accounts").delete().eq("org_id", orgId);
       setConnected(false);
       setPages([]);
-      toast({ title: "Disconnected", description: "Facebook integration removed." });
+      setIgAccounts([]);
+      toast({ title: "Disconnected", description: "Facebook & Instagram integration removed." });
     } catch (e) {
       toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
     } finally {
