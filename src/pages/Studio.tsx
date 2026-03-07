@@ -243,10 +243,17 @@ export default function Studio() {
         }
       : undefined;
 
+    // Build prompt with page profile context for images
+    const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
+    let fullImagePrompt = imagePrompt.trim();
+    if (selectedPage?.system_prompt) {
+      fullImagePrompt = `${selectedPage.system_prompt}\n\n---\nImage request: ${fullImagePrompt}`;
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke("generate-image", {
         body: {
-          prompt: imagePrompt.trim(),
+          prompt: fullImagePrompt,
           brandStyle,
           platform: imagePlatform || undefined,
         },
