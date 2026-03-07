@@ -46,6 +46,7 @@ const createNav = [
   { title: "Content Studio", url: "/studio", icon: Sparkles },
   { title: "Asset Library", url: "/assets", icon: FolderOpen },
   { title: "Content Calendar", url: "/calendar", icon: CalendarDays },
+  { title: "Pages", url: "/pages", icon: FileText },
 ];
 
 const manageNav = [
