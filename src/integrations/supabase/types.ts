@@ -109,6 +109,50 @@ export type Database = {
           },
         ]
       }
+      facebook_credentials: {
+        Row: {
+          app_id_encrypted: string
+          app_secret_encrypted: string
+          created_at: string
+          id: string
+          iv: string
+          org_id: string
+          salt: string
+          updated_at: string
+          user_token_encrypted: string
+        }
+        Insert: {
+          app_id_encrypted: string
+          app_secret_encrypted: string
+          created_at?: string
+          id?: string
+          iv: string
+          org_id: string
+          salt: string
+          updated_at?: string
+          user_token_encrypted: string
+        }
+        Update: {
+          app_id_encrypted?: string
+          app_secret_encrypted?: string
+          created_at?: string
+          id?: string
+          iv?: string
+          org_id?: string
+          salt?: string
+          updated_at?: string
+          user_token_encrypted?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facebook_credentials_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       facebook_pages: {
         Row: {
           access_token_encrypted: string | null
@@ -117,6 +161,9 @@ export type Database = {
           org_id: string
           page_id: string
           page_name: string | null
+          page_token_encrypted: string | null
+          page_token_iv: string | null
+          page_token_salt: string | null
         }
         Insert: {
           access_token_encrypted?: string | null
@@ -125,6 +172,9 @@ export type Database = {
           org_id: string
           page_id: string
           page_name?: string | null
+          page_token_encrypted?: string | null
+          page_token_iv?: string | null
+          page_token_salt?: string | null
         }
         Update: {
           access_token_encrypted?: string | null
@@ -133,6 +183,9 @@ export type Database = {
           org_id?: string
           page_id?: string
           page_name?: string | null
+          page_token_encrypted?: string | null
+          page_token_iv?: string | null
+          page_token_salt?: string | null
         }
         Relationships: [
           {
