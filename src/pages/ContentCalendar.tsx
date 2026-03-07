@@ -367,6 +367,7 @@ export default function ContentCalendar() {
     }
   };
 
+  const dayPosts = selectedDay
     ? postsByDay.get(format(selectedDay, "yyyy-MM-dd")) || []
     : [];
 
