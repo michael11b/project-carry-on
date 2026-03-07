@@ -36,6 +36,7 @@ interface ScheduledPost {
   scheduled_at: string;
   created_at: string;
   facebook_page_id?: string | null;
+  instagram_account_id?: string | null;
   media_url?: string | null;
   post_type?: string | null;
   published_fb_id?: string | null;
