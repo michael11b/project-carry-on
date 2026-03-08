@@ -54,12 +54,14 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
   const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
   const [scheduleTime, setScheduleTime] = useState("09:00");
   const [title, setTitle] = useState("");
+  const [caption, setCaption] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Sync default title from prop
+  // Sync default title and caption from props
   useEffect(() => {
     if (defaultTitle && !title) setTitle(defaultTitle);
+    if (defaultTitle && !caption) setCaption(defaultTitle);
   }, [defaultTitle]);
 
   // Fetch org
@@ -148,7 +150,7 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
           org_id: orgId,
           created_by: user.id,
           title: postTitle,
-          content,
+          content: caption.trim() || postTitle,
           channel,
           status: "scheduled" as const,
           scheduled_at: scheduledAt.toISOString(),
@@ -166,7 +168,7 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
           org_id: orgId,
           created_by: user.id,
           title: postTitle,
-          content,
+          content: caption.trim() || postTitle,
           channel,
           status: "scheduled" as const,
           scheduled_at: new Date().toISOString(),
@@ -227,6 +229,18 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
               placeholder="Post title"
               className="h-8 text-sm"
               disabled={publishing}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">Caption / Post Text</Label>
+            <Textarea
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="What will be posted as the caption/message"
+              className="text-sm min-h-[60px]"
+              disabled={publishing}
+              rows={3}
             />
           </div>
 
