@@ -91,27 +91,34 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
     try {
       let query = supabase
         .from("scheduled_posts")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("org_id", orgId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (statusFilter !== "all") {
         query = query.eq("status", statusFilter as any);
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
       setPosts((data as unknown as Post[]) || []);
+      setTotalCount(count ?? 0);
     } catch (e) {
       toast({ title: "Failed to load posts", description: (e as Error).message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [orgId, statusFilter, toast]);
+  }, [orgId, statusFilter, page, toast]);
 
   useEffect(() => {
     if (orgId) fetchPosts();
   }, [fetchPosts, orgId]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(0);
+  }, [statusFilter, searchQuery]);
 
   const filteredPosts = posts.filter((p) => {
     if (!searchQuery) return true;
