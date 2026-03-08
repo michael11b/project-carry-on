@@ -230,6 +230,17 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
               className="h-8 text-sm"
               disabled={publishing}
             />
+
+          <div className="space-y-2">
+            <Label className="text-xs">Caption / Post Text</Label>
+            <Textarea
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="What will be posted as the caption/message"
+              className="text-sm min-h-[60px]"
+              disabled={publishing}
+              rows={3}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
