@@ -58,9 +58,10 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
   const [publishing, setPublishing] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Sync default title from prop
+  // Sync default title and caption from props
   useEffect(() => {
     if (defaultTitle && !title) setTitle(defaultTitle);
+    if (defaultTitle && !caption) setCaption(defaultTitle);
   }, [defaultTitle]);
 
   // Fetch org
