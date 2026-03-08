@@ -408,7 +408,9 @@ export default function VideoCreator() {
     ctx.scale(previewScale, previewScale);
     const virtualCanvas = { width: ratio.width, height: ratio.height } as HTMLCanvasElement;
     Object.defineProperty(ctx, 'canvas', { value: virtualCanvas, configurable: true });
-    drawFrame(ctx, script.slides[currentSlide], gradientPhase, textOpacity, waveformData, playbackProgress, showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.currententSlide, gradientPhase, textOpacity, drawFrame, ratio, waveformData, playbackProgress, showWaveform]);
+    drawFrame(ctx, script.slides[currentSlide], gradientPhase, textOpacity, waveformData, playbackProgress, showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.current);
+    ctx.restore();
+  }, [script, currentSlide, gradientPhase, textOpacity, drawFrame, ratio, waveformData, playbackProgress, showWaveform, bgType, bgMediaUrl]);
 
   // Animation loop for preview
   useEffect(() => {
