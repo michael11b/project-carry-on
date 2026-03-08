@@ -11,6 +11,7 @@ import {
 import {
   Sparkles, Loader2, Play, Pause, Download, Film,
   ChevronLeft, ChevronRight, RotateCcw, Volume2, AudioWaveform,
+  ImagePlus, VideoIcon, X,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
