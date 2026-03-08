@@ -798,10 +798,11 @@ export default function VideoCreator() {
       cancelAnimationFrame(animationRef.current);
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
       if (bgMusicEl) { bgMusicEl.pause(); bgMusicAudioRef.current = null; }
+      if (bgFadeInterval) clearInterval(bgFadeInterval);
       if (audioCtx) { audioCtx.close().catch(() => {}); playbackAudioCtxRef.current = null; analyserRef.current = null; }
       setWaveformData(null);
     };
-  }, [isPlaying, getSlideDuration, showWaveform, bgMusicUrl, bgMusicVolume, transitionType, transitionDuration, ratio, drawFrame, compositeTransition, renderSlideToCanvas, getSlideBg, textStyle, waveformStyle]);
+  }, [isPlaying, getSlideDuration, showWaveform, bgMusicUrl, bgMusicVolume, bgMusicTrimStart, bgMusicTrimEnd, bgMusicDuration, bgMusicLoop, bgMusicFadeIn, bgMusicFadeOut, transitionType, transitionDuration, ratio, drawFrame, compositeTransition, renderSlideToCanvas, getSlideBg, textStyle, waveformStyle]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────
 
