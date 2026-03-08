@@ -288,7 +288,7 @@ export default function VideoCreator() {
         ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
         ctx.lineWidth = 1.5;
         ctx.stroke();
-      } elseeffectif (waveStyle === "line") {
+      } else if (effectiveStyle === "line") {
         const waveformY = height * 0.78;
         const waveStartX = width * 0.15;
         const waveEndX = width * 0.85;
