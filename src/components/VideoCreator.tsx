@@ -166,6 +166,14 @@ export default function VideoCreator() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
 
+  // Background music state
+  const [bgMusicBlob, setBgMusicBlob] = useState<Blob | null>(null);
+  const [bgMusicUrl, setBgMusicUrl] = useState<string | null>(null);
+  const [bgMusicVolume, setBgMusicVolume] = useState(0.3);
+  const [isGeneratingMusic, setIsGeneratingMusic] = useState(false);
+  const [bgMusicName, setBgMusicName] = useState<string>("");
+  const bgMusicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const bgMusicFileInputRef = useRef<HTMLInputElement>(null);
   const ratio = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[0];
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
