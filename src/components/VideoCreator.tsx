@@ -612,6 +612,11 @@ export default function VideoCreator() {
     toast({ title: "Recording video…", description: "Please wait while the video is being recorded." });
 
     try {
+      // Reset background video to start for export
+      if (bgVideoRef.current) {
+        bgVideoRef.current.currentTime = 0;
+        bgVideoRef.current.play().catch(() => {});
+      }
       // Create a full-resolution offscreen canvas
       const offscreen = document.createElement("canvas");
       offscreen.width = ratio.width;
