@@ -11,9 +11,10 @@ import {
 import {
   Sparkles, Loader2, Play, Pause, Download, Film,
   ChevronLeft, ChevronRight, RotateCcw, Volume2, AudioWaveform,
-  ImagePlus, VideoIcon, X,
+  ImagePlus, VideoIcon, X, Type,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
