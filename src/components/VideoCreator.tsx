@@ -10,8 +10,9 @@ import {
 } from "@/components/ui/select";
 import {
   Sparkles, Loader2, Play, Pause, Download, Film,
-  ChevronLeft, ChevronRight, RotateCcw, Volume2,
+  ChevronLeft, ChevronRight, RotateCcw, Volume2, AudioWaveform,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
