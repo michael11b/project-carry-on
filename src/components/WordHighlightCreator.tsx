@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -99,13 +99,13 @@ export default function WordHighlightCreator() {
 
   const ratio = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[0];
 
-  // Compute cumulative timing from segments
-  const segmentTimings = segments.map((seg, i) => {
+  // Compute cumulative timing from segments (memoized to prevent effect restarts)
+  const segmentTimings = useMemo(() => segments.map((seg, i) => {
     const startTime = segments.slice(0, i).reduce((sum, s) => sum + s.duration, 0);
     return { ...seg, startTime, words: seg.text.trim().split(/\s+/).filter(Boolean) };
-  });
-  const totalScriptDuration = segments.reduce((sum, s) => sum + s.duration, 0);
-  const fullVoiceover = segments.map(s => s.voiceover).join(". ");
+  }), [segments]);
+  const totalScriptDuration = useMemo(() => segments.reduce((sum, s) => sum + s.duration, 0), [segments]);
+  const fullVoiceover = useMemo(() => segments.map(s => s.voiceover).join(". "), [segments]);
 
   // ─── Script Generation ──────────────────────────────────────────────────
 
@@ -428,6 +428,9 @@ export default function WordHighlightCreator() {
 
   // ─── Playback loop ─────────────────────────────────────────────────────
 
+  const playbackTimeRef = useRef(0);
+  const timeDisplayRef = useRef<HTMLSpanElement>(null);
+
   useEffect(() => {
     if (!isPlaying || !audioBlob || segmentTimings.length === 0) return;
 
@@ -435,20 +438,30 @@ export default function WordHighlightCreator() {
     const audio = new Audio(url);
     audioRef.current = audio;
     playStartRef.current = Date.now();
-    let phase = gradientPhase;
+    let phase = 0;
+    let stopped = false;
 
     audio.play().catch(() => {});
 
     audio.addEventListener("ended", () => {
-      setIsPlaying(false);
-      setPlaybackTime(0);
+      if (!stopped) {
+        stopped = true;
+        setIsPlaying(false);
+        playbackTimeRef.current = 0;
+        setPlaybackTime(0);
+      }
     });
 
     const animate = () => {
+      if (stopped) return;
       const elapsed = (Date.now() - playStartRef.current) / 1000;
       phase += 1;
-      setPlaybackTime(elapsed);
-      setGradientPhase(phase);
+      playbackTimeRef.current = elapsed;
+
+      // Update time display directly (no setState to avoid re-renders)
+      if (timeDisplayRef.current) {
+        timeDisplayRef.current.textContent = `${elapsed.toFixed(1)}s / ${audioDuration.toFixed(1)}s`;
+      }
 
       const { segmentIndex, wordIndex, wordProgress } = getSegmentAndWord(elapsed, audioDuration);
       const seg = segmentTimings[segmentIndex];
@@ -473,18 +486,26 @@ export default function WordHighlightCreator() {
 
       if (elapsed < audioDuration) {
         animationRef.current = requestAnimationFrame(animate);
+      } else if (!stopped) {
+        stopped = true;
+        setIsPlaying(false);
+        playbackTimeRef.current = 0;
+        setPlaybackTime(0);
       }
     };
 
     animationRef.current = requestAnimationFrame(animate);
 
     return () => {
+      stopped = true;
       cancelAnimationFrame(animationRef.current);
       audio.pause();
       URL.revokeObjectURL(url);
       audioRef.current = null;
     };
-  }, [isPlaying, audioBlob, audioDuration, segmentTimings, segments.length, drawFrame, getSegmentAndWord, gradient, font, bold, baseColor, highlightColor, highlightStyle, enlargeScale, ratio]);
+  // Only re-run when isPlaying or audioBlob/segments change, NOT on style changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, audioBlob, audioDuration, segmentTimings]);
 
   // ─── Export ─────────────────────────────────────────────────────────────
 
@@ -819,9 +840,9 @@ export default function WordHighlightCreator() {
                   >
                     {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                   </Button>
-                  <span className="text-xs text-muted-foreground">
-                    {isPlaying ? `${playbackTime.toFixed(1)}s / ${audioDuration.toFixed(1)}s` : "Ready to play"}
-                  </span>
+                   <span ref={timeDisplayRef} className="text-xs text-muted-foreground">
+                     {isPlaying ? `0.0s / ${audioDuration.toFixed(1)}s` : "Ready to play"}
+                   </span>
                   {!isPlaying && playbackTime > 0 && (
                     <Button variant="ghost" size="sm" onClick={() => setPlaybackTime(0)} className="gap-1 text-xs">
                       <RotateCcw className="h-3 w-3" /> Reset
