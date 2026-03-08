@@ -273,11 +273,13 @@ export default function VideoCreator() {
       }
     }
 
-    // Text rendering
-    ctx.globalAlpha = opacity;
+    // Text rendering with style options
+    const style = ts || { font: "system-ui, -apple-system, sans-serif", sizeMultiplier: 1, position: "center", animation: "fade", bold: true, color: "#ffffff" };
     const text = slide.text;
-    const fontSize = Math.min(width, height) * 0.06;
-    ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+    const baseFontSize = Math.min(width, height) * 0.06;
+    const fontSize = baseFontSize * style.sizeMultiplier;
+    const weight = style.bold ? "bold" : "normal";
+    ctx.font = `${weight} ${fontSize}px ${style.font}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
@@ -304,12 +306,97 @@ export default function VideoCreator() {
 
     const lineHeight = fontSize * 1.3;
     const totalHeight = lines.length * lineHeight;
-    const startY = height / 2 - totalHeight / 2 + lineHeight / 2;
 
-    ctx.fillStyle = "#ffffff";
-    lines.forEach((line, i) => {
-      ctx.fillText(line, width / 2, startY + i * lineHeight);
-    });
+    // Position
+    let baseY: number;
+    if (style.position === "top") {
+      baseY = height * 0.15 + lineHeight / 2;
+    } else if (style.position === "bottom") {
+      baseY = height * 0.7 - totalHeight / 2 + lineHeight / 2;
+    } else {
+      baseY = height / 2 - totalHeight / 2 + lineHeight / 2;
+    }
+
+    // Animation transforms
+    let textAlpha = opacity;
+    let offsetY = 0;
+    let scaleVal = 1;
+    const fadeTime = 0.3;
+    const slideDur = slide.duration || 3;
+    // Use progress if available, otherwise estimate from opacity
+    const elapsed = (progress || 0) * slideDur;
+
+    if (style.animation === "fade") {
+      textAlpha = opacity;
+    } else if (style.animation === "slide-up") {
+      if (elapsed < fadeTime) {
+        const t = elapsed / fadeTime;
+        textAlpha = t;
+        offsetY = (1 - t) * height * 0.05;
+      } else if (elapsed > slideDur - fadeTime) {
+        const t = Math.max(0, (slideDur - elapsed) / fadeTime);
+        textAlpha = t;
+        offsetY = -(1 - t) * height * 0.05;
+      }
+    } else if (style.animation === "scale") {
+      if (elapsed < fadeTime) {
+        const t = elapsed / fadeTime;
+        textAlpha = t;
+        scaleVal = 0.7 + t * 0.3;
+      } else if (elapsed > slideDur - fadeTime) {
+        const t = Math.max(0, (slideDur - elapsed) / fadeTime);
+        textAlpha = t;
+        scaleVal = 0.7 + t * 0.3;
+      }
+    } else if (style.animation === "typewriter") {
+      const revealProgress = Math.min(elapsed / (slideDur * 0.6), 1);
+      const totalChars = text.length;
+      const visibleChars = Math.floor(revealProgress * totalChars);
+      // We'll handle typewriter in the draw loop below
+      ctx.globalAlpha = opacity;
+      ctx.fillStyle = style.color;
+      // Rebuild lines with visible chars only
+      const visibleText = text.substring(0, visibleChars);
+      const twWords = visibleText.split(" ");
+      const twLines: string[] = [];
+      let twLine = "";
+      for (const word of twWords) {
+        const test = twLine ? `${twLine} ${word}` : word;
+        if (ctx.measureText(test).width > maxWidth && twLine) {
+          twLines.push(twLine);
+          twLine = word;
+        } else {
+          twLine = test;
+        }
+      }
+      if (twLine) twLines.push(twLine);
+      twLines.forEach((line, i) => {
+        ctx.fillText(line, width / 2, baseY + i * lineHeight);
+      });
+      ctx.globalAlpha = 1;
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      // Skip the normal draw below
+      // Jump to waveform section
+      goto_waveform();
+      return_early();
+    }
+
+    // Apply scale transform if needed
+    if (style.animation !== "typewriter") {
+      ctx.save();
+      if (scaleVal !== 1) {
+        ctx.translate(width / 2, baseY + totalHeight / 2);
+        ctx.scale(scaleVal, scaleVal);
+        ctx.translate(-(width / 2), -(baseY + totalHeight / 2));
+      }
+      ctx.globalAlpha = textAlpha;
+      ctx.fillStyle = style.color;
+      lines.forEach((line, i) => {
+        ctx.fillText(line, width / 2, baseY + offsetY + i * lineHeight);
+      });
+      ctx.restore();
+    }
 
     ctx.globalAlpha = 1;
     ctx.shadowColor = "transparent";
