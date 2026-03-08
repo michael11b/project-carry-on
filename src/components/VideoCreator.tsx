@@ -229,7 +229,7 @@ export default function VideoCreator() {
       ctx.globalAlpha = 0.85;
       const effectiveStyle = waveStyle || "bars";
 
-      if (waveStyle === "bars") {
+      if (effectiveStyle === "bars") {
         const barCount = 40;
         const barWidth = (width * 0.6) / barCount;
         const barGap = barWidth * 0.3;
