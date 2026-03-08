@@ -184,6 +184,12 @@ export default function VideoCreator() {
   const [bgMusicName, setBgMusicName] = useState<string>("");
   const bgMusicAudioRef = useRef<HTMLAudioElement | null>(null);
   const bgMusicFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Transition state
+  const [transitionType, setTransitionType] = useState<TransitionType>("crossfade");
+  const [transitionDuration, setTransitionDuration] = useState(0.5);
+  const transitionCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
   const ratio = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[0];
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
