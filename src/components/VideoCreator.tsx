@@ -288,6 +288,7 @@ export default function VideoCreator() {
       setScript(data);
       setCurrentSlide(0);
       setAudioBlobs(new Map());
+      setAudioDurations(new Map());
       toast({ title: "Script generated!", description: `${data.slides.length} slides created.` });
     } catch (e) {
       toast({ title: "Generation failed", description: (e as Error).message, variant: "destructive" });
