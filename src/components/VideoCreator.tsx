@@ -444,9 +444,10 @@ export default function VideoCreator() {
           const elapsed = (Date.now() - startTime) / 1000;
           phase += 1;
 
+          const slideDurSec = durationMs / 1000;
           let opacity = 1;
           if (elapsed < 0.3) opacity = elapsed / 0.3;
-          else if (elapsed > slide.duration - 0.3) opacity = Math.max(0, (slide.duration - elapsed) / 0.3);
+          else if (elapsed > slideDurSec - 0.3) opacity = Math.max(0, (slideDurSec - elapsed) / 0.3);
 
           drawFrame(offCtx, slide, phase, opacity);
           await new Promise(r => setTimeout(r, 33)); // ~30fps
