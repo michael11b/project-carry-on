@@ -408,9 +408,7 @@ export default function VideoCreator() {
     ctx.scale(previewScale, previewScale);
     const virtualCanvas = { width: ratio.width, height: ratio.height } as HTMLCanvasElement;
     Object.defineProperty(ctx, 'canvas', { value: virtualCanvas, configurable: true });
-    drawFrame(ctx, script.slides[currentSlide], gradientPhase, textOpacity, waveformData, playbackProgress, showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.current);
-    ctx.restore();
-  }, [script, currentSlide, gradientPhase, textOpacity, drawFrame, ratio, waveformData, playbackProgress, showWaveform]);
+    drawFrame(ctx, script.slides[currentSlide], gradientPhase, textOpacity, waveformData, playbackProgress, showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.currententSlide, gradientPhase, textOpacity, drawFrame, ratio, waveformData, playbackProgress, showWaveform]);
 
   // Animation loop for preview
   useEffect(() => {
@@ -682,8 +680,7 @@ export default function VideoCreator() {
           const exportProgress = elapsed / slideDurSec;
           // Generate fake waveform bars for export if waveform enabled
           const exportWaveform = showWaveform ? new Float32Array(64).map(() => Math.random() * 180 + 20) : null;
-          drawFrame(offCtx, slide, phase, opacity, exportWaveform, exp, bgImageRef.current, bgVideoRef.currentortProgress, showWaveform, waveformStyle);
-          await new Promise(r => setTimeout(r, 33)); // ~30fps
+          drawFrame(offCtx, slide, phase, opacity, exportWaveform, exp, bgImageRef.current, bgVideoRef.currentortProgress, showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.currentimeout(r, 33)); // ~30fps
         }
       }
 
