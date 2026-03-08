@@ -90,6 +90,13 @@ export default function VideoCreator() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const playbackAudioCtxRef = useRef<AudioContext | null>(null);
 
+  // Background media state
+  const [bgType, setBgType] = useState<"gradient" | "image" | "video">("gradient");
+  const [bgMediaUrl, setBgMediaUrl] = useState<string | null>(null);
+  const bgImageRef = useRef<HTMLImageElement | null>(null);
+  const bgVideoRef = useRef<HTMLVideoElement | null>(null);
+  const bgFileInputRef = useRef<HTMLInputElement>(null);
+
   // Recording state
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
