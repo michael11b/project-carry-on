@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save, Facebook } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save, Facebook, ChevronDown, Settings2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -77,6 +79,37 @@ export default function Studio() {
   // Page profile state
   const [pageProfiles, setPageProfiles] = useState<PageProfile[]>([]);
   const [selectedPageProfileId, setSelectedPageProfileId] = useState<string>("");
+  const [contextOpen, setContextOpen] = useState(false);
+
+  // Editable page context overrides (pre-populated from selected page)
+  const [ctxDescription, setCtxDescription] = useState("");
+  const [ctxAudience, setCtxAudience] = useState("");
+  const [ctxTone, setCtxTone] = useState("");
+  const [ctxTopics, setCtxTopics] = useState("");
+  const [ctxGoals, setCtxGoals] = useState("");
+  const [ctxHashtags, setCtxHashtags] = useState("");
+
+  // Sync overrides when page selection changes
+  useEffect(() => {
+    const page = pageProfiles.find((p) => p.id === selectedPageProfileId);
+    if (page) {
+      setCtxDescription(page.description || "");
+      setCtxAudience(page.target_audience || "");
+      setCtxTone(page.content_tone || "");
+      setCtxTopics(page.content_topics?.join(", ") || "");
+      setCtxGoals(page.posting_goals || "");
+      setCtxHashtags(page.hashtag_preferences || "");
+      setContextOpen(true);
+    } else {
+      setCtxDescription("");
+      setCtxAudience("");
+      setCtxTone("");
+      setCtxTopics("");
+      setCtxGoals("");
+      setCtxHashtags("");
+      setContextOpen(false);
+    }
+  }, [selectedPageProfileId, pageProfiles]);
 
   // Image tab state
   const [imagePrompt, setImagePrompt] = useState("");
@@ -141,23 +174,24 @@ export default function Studio() {
         }
       : undefined;
 
-    // Determine content type based on page selection and channel
+    // Determine content type based on page selection
     const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
+    const hasPageContext = selectedPage || ctxDescription || ctxAudience || ctxTone || ctxTopics || ctxGoals || ctxHashtags;
     let contentType: string | undefined;
     if (selectedPage) {
-      contentType = "facebook_post"; // Page selected = Facebook post context
+      contentType = "facebook_post";
     }
 
-    // Build page context for the edge function
-    const pageContext = selectedPage ? {
-      page_name: selectedPage.page_name,
-      description: selectedPage.description,
-      target_audience: selectedPage.target_audience,
-      content_tone: selectedPage.content_tone,
-      content_topics: selectedPage.content_topics,
-      posting_goals: selectedPage.posting_goals,
-      hashtag_preferences: selectedPage.hashtag_preferences,
-      custom_system_prompt: selectedPage.system_prompt,
+    // Build page context from editable overrides
+    const pageContext = hasPageContext ? {
+      page_name: selectedPage?.page_name || "",
+      description: ctxDescription,
+      target_audience: ctxAudience,
+      content_tone: ctxTone,
+      content_topics: ctxTopics ? ctxTopics.split(",").map((t) => t.trim()).filter(Boolean) : [],
+      posting_goals: ctxGoals,
+      hashtag_preferences: ctxHashtags,
+      custom_system_prompt: selectedPage?.system_prompt || "",
     } : undefined;
 
     await streamGenerate({
@@ -257,17 +291,17 @@ export default function Studio() {
         }
       : undefined;
 
-    // Build page context for images
+    // Build page context from editable overrides for images
     const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
     let contentType: string | undefined;
     if (selectedPage) {
       contentType = "facebook_post_image";
     }
 
-    const pageContext = selectedPage ? {
-      page_name: selectedPage.page_name,
-      description: selectedPage.description,
-      content_tone: selectedPage.content_tone,
+    const pageContext = (selectedPage || ctxDescription || ctxTone) ? {
+      page_name: selectedPage?.page_name || "",
+      description: ctxDescription,
+      content_tone: ctxTone,
     } : undefined;
 
     try {
@@ -328,6 +362,88 @@ export default function Studio() {
           )}
         </div>
       </motion.div>
+
+      {/* Editable Page Context */}
+      <Collapsible open={contextOpen} onOpenChange={setContextOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2 text-muted-foreground">
+            <Settings2 className="h-4 w-4" />
+            Content Context
+            <ChevronDown className={`h-4 w-4 transition-transform ${contextOpen ? "rotate-180" : ""}`} />
+            {(ctxDescription || ctxAudience || ctxTone) && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">Active</Badge>
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <Card className="mt-3">
+            <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Description</Label>
+                <Textarea
+                  placeholder="What is this content about?"
+                  value={ctxDescription}
+                  onChange={(e) => setCtxDescription(e.target.value)}
+                  className="min-h-[60px] text-xs resize-none"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Target Audience</Label>
+                <Input
+                  placeholder="e.g. Young crypto traders aged 18-35"
+                  value={ctxAudience}
+                  onChange={(e) => setCtxAudience(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Tone</Label>
+                <Select value={ctxTone} onValueChange={setCtxTone}>
+                  <SelectTrigger className="text-xs">
+                    <SelectValue placeholder="Select tone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="casual">Casual & Friendly</SelectItem>
+                    <SelectItem value="professional">Professional</SelectItem>
+                    <SelectItem value="inspirational">Inspirational</SelectItem>
+                    <SelectItem value="humorous">Humorous & Fun</SelectItem>
+                    <SelectItem value="educational">Educational</SelectItem>
+                    <SelectItem value="authoritative">Authoritative</SelectItem>
+                    <SelectItem value="empathetic">Empathetic & Warm</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Topics (comma-separated)</Label>
+                <Input
+                  placeholder="e.g. Bitcoin, Trading signals, Market analysis"
+                  value={ctxTopics}
+                  onChange={(e) => setCtxTopics(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Goals</Label>
+                <Input
+                  placeholder="e.g. Drive engagement, build trust"
+                  value={ctxGoals}
+                  onChange={(e) => setCtxGoals(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Hashtags</Label>
+                <Input
+                  placeholder="e.g. #Bitcoin #CryptoSignals"
+                  value={ctxHashtags}
+                  onChange={(e) => setCtxHashtags(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
 
       <Tabs defaultValue="text" className="space-y-4">
         <TabsList className="grid w-full max-w-lg grid-cols-4">
