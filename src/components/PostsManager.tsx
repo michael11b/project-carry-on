@@ -76,8 +76,9 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
   const [syncing, setSyncing] = useState(false);
 
   // Delete dialog
-  const [deletePostId, setDeletePostId] = useState<string | null>(null);
+  const [deletePost, setDeletePost] = useState<Post | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteFromFb, setDeleteFromFb] = useState(false);
 
   // View dialog
   const [viewPost, setViewPost] = useState<Post | null>(null);
