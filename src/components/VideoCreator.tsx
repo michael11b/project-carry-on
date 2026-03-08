@@ -1137,6 +1137,11 @@ export default function VideoCreator() {
     setBgMusicBlob(file);
     setBgMusicUrl(url);
     setBgMusicName(file.name);
+    getAudioBlobDuration(file).then((dur) => {
+      setBgMusicDuration(dur);
+      setBgMusicTrimStart(0);
+      setBgMusicTrimEnd(dur);
+    });
     if (bgMusicFileInputRef.current) bgMusicFileInputRef.current.value = "";
   };
 
