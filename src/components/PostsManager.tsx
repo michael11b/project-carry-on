@@ -179,16 +179,31 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
   };
 
   const handleDelete = async () => {
-    if (!deletePostId) return;
+    if (!deletePost) return;
     setDeleting(true);
     try {
+      // Attempt Facebook deletion if requested
+      if (deleteFromFb && deletePost.published_fb_id && deletePost.channel === "facebook") {
+        const { data, error: fbErr } = await supabase.functions.invoke("facebook-delete", {
+          body: { post_id: deletePost.id },
+        });
+        if (fbErr) {
+          toast({ title: "Facebook delete failed", description: (fbErr as Error).message, variant: "destructive" });
+        } else if (data?.fb_error) {
+          toast({ title: "Could not delete from Facebook", description: data.fb_error + " The post will be removed locally.", variant: "destructive" });
+        } else if (data?.success) {
+          toast({ title: "Deleted from Facebook" });
+        }
+      }
+
       const { error } = await supabase
         .from("scheduled_posts")
         .delete()
-        .eq("id", deletePostId);
+        .eq("id", deletePost.id);
       if (error) throw error;
       toast({ title: "Post deleted" });
-      setDeletePostId(null);
+      setDeletePost(null);
+      setDeleteFromFb(false);
       fetchPosts();
     } catch (e) {
       toast({ title: "Delete failed", description: (e as Error).message, variant: "destructive" });
