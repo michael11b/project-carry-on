@@ -302,6 +302,7 @@ export default function VideoCreator() {
     setIsGeneratingAudio(true);
     setAudioProgress(0);
     const newBlobs = new Map<number, Blob>();
+    const newDurations = new Map<number, number>();
 
     try {
       for (let i = 0; i < script.slides.length; i++) {
@@ -329,10 +330,15 @@ export default function VideoCreator() {
 
         const blob = await response.blob();
         newBlobs.set(i, blob);
+
+        // Measure actual audio duration
+        const duration = await getAudioBlobDuration(blob);
+        newDurations.set(i, duration);
       }
 
       setAudioBlobs(newBlobs);
-      toast({ title: "Audio generated!", description: `${script.slides.length} voiceovers ready.` });
+      setAudioDurations(newDurations);
+      toast({ title: "Audio generated!", description: `${script.slides.length} voiceovers ready. Slide durations synced to audio.` });
     } catch (e) {
       toast({ title: "Audio generation failed", description: (e as Error).message, variant: "destructive" });
     } finally {
