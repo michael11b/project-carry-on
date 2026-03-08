@@ -176,7 +176,7 @@ export default function VideoCreator() {
   // Recording state
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
-
+  const [exportedVideoUrl, setExportedVideoUrl] = useState<string | null>(null);
   // Background music state
   const [bgMusicBlob, setBgMusicBlob] = useState<Blob | null>(null);
   const [bgMusicUrl, setBgMusicUrl] = useState<string | null>(null);
