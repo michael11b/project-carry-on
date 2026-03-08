@@ -107,6 +107,16 @@ const MUSIC_PRESETS = [
   { value: "acoustic", label: "Acoustic", prompt: "Acoustic guitar background music, warm, gentle, organic feel" },
 ];
 
+type TransitionType = "none" | "crossfade" | "slide" | "zoom" | "wipe";
+
+const TRANSITION_OPTIONS: { value: TransitionType; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "crossfade", label: "Crossfade" },
+  { value: "slide", label: "Slide" },
+  { value: "zoom", label: "Zoom" },
+  { value: "wipe", label: "Wipe" },
+];
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function VideoCreator() {
@@ -174,6 +184,12 @@ export default function VideoCreator() {
   const [bgMusicName, setBgMusicName] = useState<string>("");
   const bgMusicAudioRef = useRef<HTMLAudioElement | null>(null);
   const bgMusicFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Transition state
+  const [transitionType, setTransitionType] = useState<TransitionType>("crossfade");
+  const [transitionDuration, setTransitionDuration] = useState(0.5);
+  const transitionCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
   const ratio = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[0];
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -469,6 +485,76 @@ export default function VideoCreator() {
     }
   }, []);
 
+  /**
+   * Composite a transition between two rendered frames.
+   * `t` is 0..1 progress through the transition.
+   */
+  const compositeTransition = useCallback((
+    ctx: CanvasRenderingContext2D,
+    outCanvas: HTMLCanvasElement,
+    inCanvas: HTMLCanvasElement,
+    t: number,
+    type: TransitionType,
+  ) => {
+    const { width, height } = ctx.canvas;
+    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+    if (type === "crossfade" || type === "none") {
+      ctx.globalAlpha = 1;
+      ctx.drawImage(outCanvas, 0, 0, width, height);
+      ctx.globalAlpha = ease;
+      ctx.drawImage(inCanvas, 0, 0, width, height);
+      ctx.globalAlpha = 1;
+    } else if (type === "slide") {
+      const offset = ease * width;
+      ctx.drawImage(outCanvas, -offset, 0, width, height);
+      ctx.drawImage(inCanvas, width - offset, 0, width, height);
+    } else if (type === "zoom") {
+      ctx.drawImage(inCanvas, 0, 0, width, height);
+      const scale = 1 + ease * 0.3;
+      const dx = (width * (1 - scale)) / 2;
+      const dy = (height * (1 - scale)) / 2;
+      ctx.globalAlpha = 1 - ease;
+      ctx.drawImage(outCanvas, dx, dy, width * scale, height * scale);
+      ctx.globalAlpha = 1;
+    } else if (type === "wipe") {
+      const wipeX = Math.floor(ease * width);
+      ctx.drawImage(outCanvas, 0, 0, width, height);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, wipeX, height);
+      ctx.clip();
+      ctx.drawImage(inCanvas, 0, 0, width, height);
+      ctx.restore();
+    }
+  }, []);
+
+  /** Helper: render a single slide to an offscreen canvas */
+  const renderSlideToCanvas = useCallback((
+    canvas: HTMLCanvasElement,
+    slide: Slide,
+    slideIndex: number,
+    phase: number,
+    opacity: number,
+    progress: number,
+    scriptGradient: string,
+    wf: Float32Array | null,
+    wfProgress: number,
+    doWaveform: boolean,
+    wfStyle: "bars" | "circular" | "line",
+    ts: TextStyle,
+  ) => {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const bg = getSlideBg(slide, scriptGradient);
+    drawFrame(
+      ctx, slide, phase, opacity, wf, wfProgress, doWaveform, wfStyle,
+      bg.type === "image" ? slideBgImagesRef.current.get(slideIndex) || null : null,
+      bg.type === "video" ? slideBgVideosRef.current.get(slideIndex) || null : null,
+      ts, bg.gradient,
+    );
+  }, [drawFrame, getSlideBg]);
+
   // ─── Draw current frame effect ─────────────────────────────────────────
 
   useEffect(() => {
@@ -507,6 +593,16 @@ export default function VideoCreator() {
     let slideStartTime = Date.now();
     let slideIndex = currentSlide;
     let phase = gradientPhase;
+    let inTransition = false;
+    let transStartTime = 0;
+
+    // Create offscreen canvases for transition compositing
+    const outCanvas = document.createElement("canvas");
+    const inCanvas = document.createElement("canvas");
+    outCanvas.width = ratio.width;
+    outCanvas.height = ratio.height;
+    inCanvas.width = ratio.width;
+    inCanvas.height = ratio.height;
 
     let audioCtx: AudioContext | null = null;
     let analyser: AnalyserNode | null = null;
@@ -554,6 +650,9 @@ export default function VideoCreator() {
       bgMusicEl.play().catch(() => {});
     }
 
+    const tType = transitionType;
+    const tDur = transitionDuration;
+
     const animate = () => {
       const elapsed = (Date.now() - slideStartTime) / 1000;
       const slideDuration = getSlideDuration(slideIndex);
@@ -577,6 +676,63 @@ export default function VideoCreator() {
       setGradientPhase(phase);
       setTextOpacity(opacity);
 
+      // Check if we should start a transition
+      const nextIndex = slideIndex + 1;
+      const hasNext = nextIndex < script.slides.length;
+      const isInTransZone = hasNext && tType !== "none" && elapsed >= slideDuration - tDur;
+
+      if (isInTransZone && !inTransition) {
+        inTransition = true;
+        transStartTime = Date.now();
+      }
+
+      // Render to main canvas via transition compositing
+      const mainCanvas = canvasRef.current;
+      if (mainCanvas && script) {
+        const previewScale = 0.3;
+        mainCanvas.width = ratio.width * previewScale;
+        mainCanvas.height = ratio.height * previewScale;
+        const mainCtx = mainCanvas.getContext("2d");
+        if (mainCtx) {
+          if (inTransition && hasNext) {
+            // Render outgoing slide
+            outCanvas.width = ratio.width;
+            outCanvas.height = ratio.height;
+            const outCtx = outCanvas.getContext("2d")!;
+            renderSlideToCanvas(outCanvas, script.slides[slideIndex], slideIndex, phase, 1, progress, script.gradient, null, 0, false, waveformStyle, textStyle);
+
+            // Render incoming slide
+            inCanvas.width = ratio.width;
+            inCanvas.height = ratio.height;
+            renderSlideToCanvas(inCanvas, script.slides[nextIndex], nextIndex, phase, 1, 0, script.gradient, null, 0, false, waveformStyle, textStyle);
+
+            // Composite
+            const tProgress = Math.min((Date.now() - transStartTime) / (tDur * 1000), 1);
+            mainCtx.save();
+            mainCtx.scale(previewScale, previewScale);
+            const virtualCanvas = { width: ratio.width, height: ratio.height } as HTMLCanvasElement;
+            Object.defineProperty(mainCtx, "canvas", { value: virtualCanvas, configurable: true });
+            compositeTransition(mainCtx, outCanvas, inCanvas, tProgress, tType);
+            mainCtx.restore();
+          } else {
+            mainCtx.save();
+            mainCtx.scale(previewScale, previewScale);
+            const virtualCanvas = { width: ratio.width, height: ratio.height } as HTMLCanvasElement;
+            Object.defineProperty(mainCtx, "canvas", { value: virtualCanvas, configurable: true });
+            const slide = script.slides[slideIndex];
+            const bg = getSlideBg(slide, script.gradient);
+            drawFrame(
+              mainCtx, slide, phase, opacity,
+              showWaveform ? (waveformData || null) : null, progress, showWaveform, waveformStyle,
+              bg.type === "image" ? slideBgImagesRef.current.get(slideIndex) || null : null,
+              bg.type === "video" ? slideBgVideosRef.current.get(slideIndex) || null : null,
+              textStyle, bg.gradient,
+            );
+            mainCtx.restore();
+          }
+        }
+      }
+
       if (elapsed >= slideDuration) {
         const next = slideIndex + 1;
         if (next >= script.slides.length) {
@@ -589,6 +745,7 @@ export default function VideoCreator() {
         slideIndex = next;
         setCurrentSlide(next);
         slideStartTime = Date.now();
+        inTransition = false;
         playSlideAudio(next);
       }
 
@@ -604,7 +761,7 @@ export default function VideoCreator() {
       if (audioCtx) { audioCtx.close().catch(() => {}); playbackAudioCtxRef.current = null; analyserRef.current = null; }
       setWaveformData(null);
     };
-  }, [isPlaying, getSlideDuration, showWaveform, bgMusicUrl, bgMusicVolume]);
+  }, [isPlaying, getSlideDuration, showWaveform, bgMusicUrl, bgMusicVolume, transitionType, transitionDuration, ratio, drawFrame, compositeTransition, renderSlideToCanvas, getSlideBg, textStyle, waveformStyle]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────
 
@@ -736,11 +893,21 @@ export default function VideoCreator() {
       slideBgVideosRef.current.forEach((v) => { v.currentTime = 0; v.play().catch(() => {}); });
 
       let phase = 0;
+      const expOutCanvas = document.createElement("canvas");
+      const expInCanvas = document.createElement("canvas");
+      expOutCanvas.width = ratio.width;
+      expOutCanvas.height = ratio.height;
+      expInCanvas.width = ratio.width;
+      expInCanvas.height = ratio.height;
+      const tType = transitionType;
+      const tDur = transitionDuration;
+
       for (let s = 0; s < script.slides.length; s++) {
         const slide = script.slides[s];
         const durationMs = getSlideDuration(s) * 1000;
         const startTime = Date.now();
         const bg = getSlideBg(slide, script.gradient);
+        const hasNext = s + 1 < script.slides.length;
 
         const audioBlob = audioBlobs.get(s);
         if (audioBlob) {
@@ -763,13 +930,25 @@ export default function VideoCreator() {
           else if (elapsed > durSec - 0.3) opacity = Math.max(0, (durSec - elapsed) / 0.3);
           const exportProgress = elapsed / durSec;
           const exportWaveform = showWaveform ? new Float32Array(64).map(() => Math.random() * 180 + 20) : null;
-          drawFrame(
-            offCtx, slide, phase, opacity, exportWaveform, exportProgress,
-            showWaveform, waveformStyle,
-            bg.type === "image" ? slideBgImagesRef.current.get(s) || null : null,
-            bg.type === "video" ? slideBgVideosRef.current.get(s) || null : null,
-            textStyle, bg.gradient,
-          );
+
+          // Check transition zone
+          const inTransZone = hasNext && tType !== "none" && elapsed >= durSec - tDur;
+
+          if (inTransZone) {
+            // Render both slides to offscreen canvases
+            renderSlideToCanvas(expOutCanvas, slide, s, phase, 1, exportProgress, script.gradient, exportWaveform, exportProgress, showWaveform, waveformStyle, textStyle);
+            renderSlideToCanvas(expInCanvas, script.slides[s + 1], s + 1, phase, 1, 0, script.gradient, null, 0, false, waveformStyle, textStyle);
+            const tProgress = Math.min((elapsed - (durSec - tDur)) / tDur, 1);
+            compositeTransition(offCtx, expOutCanvas, expInCanvas, tProgress, tType);
+          } else {
+            drawFrame(
+              offCtx, slide, phase, opacity, exportWaveform, exportProgress,
+              showWaveform, waveformStyle,
+              bg.type === "image" ? slideBgImagesRef.current.get(s) || null : null,
+              bg.type === "video" ? slideBgVideosRef.current.get(s) || null : null,
+              textStyle, bg.gradient,
+            );
+          }
           await new Promise(r => setTimeout(r, 33));
         }
       }
@@ -1269,6 +1448,40 @@ export default function VideoCreator() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Slide Transitions */}
+              <div className="space-y-3 border border-border rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <Film className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-xs font-medium">Slide Transitions</Label>
+                </div>
+                <div className="flex gap-1 flex-wrap">
+                  {TRANSITION_OPTIONS.map(t => (
+                    <button
+                      key={t.value}
+                      onClick={() => setTransitionType(t.value)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                        transitionType === t.value
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                {transitionType !== "none" && (
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Duration ({transitionDuration.toFixed(1)}s)</Label>
+                    <Slider
+                      value={[transitionDuration]}
+                      min={0.2} max={1.5} step={0.1}
+                      onValueChange={([v]) => setTransitionDuration(v)}
+                      className="py-1"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Waveform toggle */}
