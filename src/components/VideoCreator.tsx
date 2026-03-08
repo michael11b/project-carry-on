@@ -88,6 +88,17 @@ export default function VideoCreator() {
 
   const ratio = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[0];
 
+  // Get effective slide duration: use audio duration if available, otherwise fallback to script duration + padding
+  const getSlideDuration = useCallback((slideIndex: number): number => {
+    const audioDur = audioDurations.get(slideIndex);
+    const scriptDur = script?.slides[slideIndex]?.duration || 3;
+    if (audioDur && audioDur > 0) {
+      // Use audio duration + 0.5s padding for breathing room
+      return Math.max(audioDur + 0.5, scriptDur);
+    }
+    return scriptDur;
+  }, [audioDurations, script]);
+
   // Canvas rendering
   const drawFrame = useCallback((ctx: CanvasRenderingContext2D, slide: Slide, phase: number, opacity: number) => {
     const { width, height } = ctx.canvas;
