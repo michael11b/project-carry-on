@@ -774,6 +774,7 @@ export default function VideoCreator() {
         }
       }
 
+      if (bgMusicSource) { try { bgMusicSource.stop(); } catch {} }
       mediaRecorder.stop();
       audioContext.close();
     } catch (e) {
