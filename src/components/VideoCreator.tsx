@@ -682,7 +682,8 @@ export default function VideoCreator() {
           const exportProgress = elapsed / slideDurSec;
           // Generate fake waveform bars for export if waveform enabled
           const exportWaveform = showWaveform ? new Float32Array(64).map(() => Math.random() * 180 + 20) : null;
-          drawFrame(offCtx, slide, phase, opacity, exportWaveform, exp, bgImageRef.current, bgVideoRef.currentortProgress, showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.currentimeout(r, 33)); // ~30fps
+          drawFrame(offCtx, slide, phase, opacity, exportWaveform, exportProgress, showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.current);
+          await new Promise(r => setTimeout(r, 33)); // ~30fps
         }
       }
 
