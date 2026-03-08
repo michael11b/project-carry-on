@@ -227,7 +227,7 @@ export default function VideoCreator() {
     // Waveform visualizer
     if (renderWaveform && waveform && waveform.length > 0) {
       ctx.globalAlpha = 0.85;
-      const waveStyle = (ctx.canvas as any)._waveformStyle || "bars";
+      const effectiveStyle = waveStyle || "bars";
 
       if (waveStyle === "bars") {
         const barCount = 40;
