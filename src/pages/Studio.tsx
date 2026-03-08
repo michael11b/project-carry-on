@@ -735,6 +735,10 @@ export default function Studio() {
           </div>
         </TabsContent>
 
+        <TabsContent value="video">
+          <VideoCreator />
+        </TabsContent>
+
         <TabsContent value="audio">
           <Card>
             <CardContent className="p-12 text-center text-muted-foreground">
