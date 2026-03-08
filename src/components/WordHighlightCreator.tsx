@@ -428,6 +428,9 @@ export default function WordHighlightCreator() {
 
   // ─── Playback loop ─────────────────────────────────────────────────────
 
+  const playbackTimeRef = useRef(0);
+  const timeDisplayRef = useRef<HTMLSpanElement>(null);
+
   useEffect(() => {
     if (!isPlaying || !audioBlob || segmentTimings.length === 0) return;
 
@@ -435,20 +438,30 @@ export default function WordHighlightCreator() {
     const audio = new Audio(url);
     audioRef.current = audio;
     playStartRef.current = Date.now();
-    let phase = gradientPhase;
+    let phase = 0;
+    let stopped = false;
 
     audio.play().catch(() => {});
 
     audio.addEventListener("ended", () => {
-      setIsPlaying(false);
-      setPlaybackTime(0);
+      if (!stopped) {
+        stopped = true;
+        setIsPlaying(false);
+        playbackTimeRef.current = 0;
+        setPlaybackTime(0);
+      }
     });
 
     const animate = () => {
+      if (stopped) return;
       const elapsed = (Date.now() - playStartRef.current) / 1000;
       phase += 1;
-      setPlaybackTime(elapsed);
-      setGradientPhase(phase);
+      playbackTimeRef.current = elapsed;
+
+      // Update time display directly (no setState to avoid re-renders)
+      if (timeDisplayRef.current) {
+        timeDisplayRef.current.textContent = `${elapsed.toFixed(1)}s / ${audioDuration.toFixed(1)}s`;
+      }
 
       const { segmentIndex, wordIndex, wordProgress } = getSegmentAndWord(elapsed, audioDuration);
       const seg = segmentTimings[segmentIndex];
@@ -473,18 +486,26 @@ export default function WordHighlightCreator() {
 
       if (elapsed < audioDuration) {
         animationRef.current = requestAnimationFrame(animate);
+      } else if (!stopped) {
+        stopped = true;
+        setIsPlaying(false);
+        playbackTimeRef.current = 0;
+        setPlaybackTime(0);
       }
     };
 
     animationRef.current = requestAnimationFrame(animate);
 
     return () => {
+      stopped = true;
       cancelAnimationFrame(animationRef.current);
       audio.pause();
       URL.revokeObjectURL(url);
       audioRef.current = null;
     };
-  }, [isPlaying, audioBlob, audioDuration, segmentTimings, segments.length, drawFrame, getSegmentAndWord, gradient, font, bold, baseColor, highlightColor, highlightStyle, enlargeScale, ratio]);
+  // Only re-run when isPlaying or audioBlob/segments change, NOT on style changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, audioBlob, audioDuration, segmentTimings]);
 
   // ─── Export ─────────────────────────────────────────────────────────────
 
