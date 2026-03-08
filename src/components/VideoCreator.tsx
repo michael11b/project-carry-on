@@ -129,6 +129,16 @@ export default function VideoCreator() {
   const bgVideoRef = useRef<HTMLVideoElement | null>(null);
   const bgFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Text styling state
+  const [textStyle, setTextStyle] = useState<TextStyle>({
+    font: FONT_OPTIONS[0].value,
+    sizeMultiplier: 1,
+    position: "center",
+    animation: "fade",
+    bold: true,
+    color: "#ffffff",
+  });
+
   // Recording state
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
