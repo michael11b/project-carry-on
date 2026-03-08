@@ -76,8 +76,9 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
   const [syncing, setSyncing] = useState(false);
 
   // Delete dialog
-  const [deletePostId, setDeletePostId] = useState<string | null>(null);
+  const [deletePost, setDeletePost] = useState<Post | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteFromFb, setDeleteFromFb] = useState(false);
 
   // View dialog
   const [viewPost, setViewPost] = useState<Post | null>(null);
@@ -178,16 +179,31 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
   };
 
   const handleDelete = async () => {
-    if (!deletePostId) return;
+    if (!deletePost) return;
     setDeleting(true);
     try {
+      // Attempt Facebook deletion if requested
+      if (deleteFromFb && deletePost.published_fb_id && deletePost.channel === "facebook") {
+        const { data, error: fbErr } = await supabase.functions.invoke("facebook-delete", {
+          body: { post_id: deletePost.id },
+        });
+        if (fbErr) {
+          toast({ title: "Facebook delete failed", description: (fbErr as Error).message, variant: "destructive" });
+        } else if (data?.fb_error) {
+          toast({ title: "Could not delete from Facebook", description: data.fb_error + " The post will be removed locally.", variant: "destructive" });
+        } else if (data?.success) {
+          toast({ title: "Deleted from Facebook" });
+        }
+      }
+
       const { error } = await supabase
         .from("scheduled_posts")
         .delete()
-        .eq("id", deletePostId);
+        .eq("id", deletePost.id);
       if (error) throw error;
       toast({ title: "Post deleted" });
-      setDeletePostId(null);
+      setDeletePost(null);
+      setDeleteFromFb(false);
       fetchPosts();
     } catch (e) {
       toast({ title: "Delete failed", description: (e as Error).message, variant: "destructive" });
@@ -292,7 +308,7 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setDeletePostId(post.id)}
+                            onClick={() => setDeletePost(post)}
                             title="Delete"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -410,7 +426,7 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
       </Dialog>
 
       {/* Delete Confirm */}
-      <AlertDialog open={!!deletePostId} onOpenChange={() => setDeletePostId(null)}>
+      <AlertDialog open={!!deletePost} onOpenChange={() => { setDeletePost(null); setDeleteFromFb(false); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this post?</AlertDialogTitle>
@@ -418,6 +434,20 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
               This action cannot be undone. The post will be permanently removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deletePost?.published_fb_id && deletePost?.channel === "facebook" && (
+            <div className="flex items-center space-x-2 px-1">
+              <input
+                type="checkbox"
+                id="delete-from-fb"
+                checked={deleteFromFb}
+                onChange={(e) => setDeleteFromFb(e.target.checked)}
+                className="h-4 w-4 rounded border-input accent-primary"
+              />
+              <label htmlFor="delete-from-fb" className="text-sm text-muted-foreground">
+                Also delete from Facebook
+              </label>
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
