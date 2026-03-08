@@ -18,10 +18,19 @@ import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface SlideBg {
+  type: "gradient" | "image" | "video";
+  gradient: string;
+  mediaUrl?: string | null;
+}
+
 interface Slide {
   text: string;
   voiceover: string;
   duration: number;
+  bg?: SlideBg;
 }
 
 interface VideoScript {
@@ -29,6 +38,17 @@ interface VideoScript {
   gradient: string;
   slides: Slide[];
 }
+
+interface TextStyle {
+  font: string;
+  sizeMultiplier: number;
+  position: "center" | "top" | "bottom";
+  animation: "fade" | "typewriter" | "scale" | "slide-up";
+  bold: boolean;
+  color: string;
+}
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const ASPECT_RATIOS = [
   { value: "9:16", label: "9:16 Vertical (Reels)", width: 1080, height: 1920 },
@@ -78,14 +98,7 @@ const TEXT_ANIMATIONS = [
   { value: "slide-up", label: "Slide Up" },
 ];
 
-interface TextStyle {
-  font: string;
-  sizeMultiplier: number; // 0.5 to 1.5, default 1
-  position: "center" | "top" | "bottom";
-  animation: "fade" | "typewriter" | "scale" | "slide-up";
-  bold: boolean;
-  color: string;
-}
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export default function VideoCreator() {
   const { toast } = useToast();
@@ -118,16 +131,17 @@ export default function VideoCreator() {
   const [showWaveform, setShowWaveform] = useState(false);
   const [waveformStyle, setWaveformStyle] = useState<"bars" | "circular" | "line">("bars");
   const [waveformData, setWaveformData] = useState<Float32Array | null>(null);
-  const [playbackProgress, setPlaybackProgress] = useState(0); // 0-1 progress within current slide
+  const [playbackProgress, setPlaybackProgress] = useState(0);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const playbackAudioCtxRef = useRef<AudioContext | null>(null);
 
-  // Background media state
-  const [bgType, setBgType] = useState<"gradient" | "image" | "video">("gradient");
-  const [bgMediaUrl, setBgMediaUrl] = useState<string | null>(null);
-  const bgImageRef = useRef<HTMLImageElement | null>(null);
-  const bgVideoRef = useRef<HTMLVideoElement | null>(null);
-  const bgFileInputRef = useRef<HTMLInputElement>(null);
+  // Per-slide background media (loaded elements keyed by slide index)
+  const slideBgImagesRef = useRef<Map<number, HTMLImageElement>>(new Map());
+  const slideBgVideosRef = useRef<Map<number, HTMLVideoElement>>(new Map());
+  const slideBgFileInputRef = useRef<HTMLInputElement>(null);
+  const [editingBgSlide, setEditingBgSlide] = useState<number | null>(null);
+  // Force re-render trigger when bg media loads
+  const [bgLoadTick, setBgLoadTick] = useState(0);
 
   // Text styling state
   const [textStyle, setTextStyle] = useState<TextStyle>({
@@ -145,100 +159,92 @@ export default function VideoCreator() {
 
   const ratio = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[0];
 
-  // Measure actual duration of an audio blob
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+
   const getAudioBlobDuration = (blob: Blob): Promise<number> => {
     return new Promise((resolve) => {
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audio.addEventListener("loadedmetadata", () => {
-        // Some browsers return Infinity for streaming audio, handle that
         if (isFinite(audio.duration)) {
           resolve(audio.duration);
         } else {
-          // Fallback: listen for durationchange
           audio.addEventListener("durationchange", () => {
             if (isFinite(audio.duration)) {
               resolve(audio.duration);
               URL.revokeObjectURL(url);
             }
           });
-          // If still can't get it, use a reasonable default after timeout
           setTimeout(() => resolve(3), 5000);
         }
         URL.revokeObjectURL(url);
       });
       audio.addEventListener("error", () => {
-        resolve(3); // fallback
+        resolve(3);
         URL.revokeObjectURL(url);
       });
     });
   };
 
-  // Get effective slide duration: use audio duration if available, otherwise fallback to script duration + padding
   const getSlideDuration = useCallback((slideIndex: number): number => {
     const audioDur = audioDurations.get(slideIndex);
     const scriptDur = script?.slides[slideIndex]?.duration || 3;
     if (audioDur && audioDur > 0) {
-      // Use audio duration + 0.5s padding for breathing room
       return Math.max(audioDur + 0.5, scriptDur);
     }
     return scriptDur;
   }, [audioDurations, script]);
 
-  // Canvas rendering
+  /** Get the effective background for a slide (falls back to script-level gradient) */
+  const getSlideBg = useCallback((slide: Slide, scriptGradient: string): SlideBg => {
+    if (slide.bg) return slide.bg;
+    return { type: "gradient", gradient: scriptGradient };
+  }, []);
+
+  // ─── Canvas Rendering ────────────────────────────────────────────────────
+
   const drawFrame = useCallback((
     ctx: CanvasRenderingContext2D,
     slide: Slide,
     phase: number,
     opacity: number,
-    waveform?: Float32Array | null,
-    progress?: number,
-    renderWaveform?: boolean,
-    waveStyle?: "bars" | "circular" | "line",
-    bgImage?: HTMLImageElement | null,
-    bgVideo?: HTMLVideoElement | null,
-    ts?: TextStyle,
+    waveform: Float32Array | null | undefined,
+    progress: number | undefined,
+    renderWaveform: boolean | undefined,
+    waveStyle: "bars" | "circular" | "line" | undefined,
+    bgImage: HTMLImageElement | null | undefined,
+    bgVideo: HTMLVideoElement | null | undefined,
+    ts: TextStyle | undefined,
+    slideGradient: string,
   ) => {
     const { width, height } = ctx.canvas;
 
-    // Background rendering
+    // ── Background ──────────────────────────────────────────────────────
     let drewCustomBg = false;
+
     if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
-      // Cover-fit the image
-      const imgRatio = bgImage.naturalWidth / bgImage.naturalHeight;
-      const canvasRatio = width / height;
+      const imgR = bgImage.naturalWidth / bgImage.naturalHeight;
+      const canR = width / height;
       let sx = 0, sy = 0, sw = bgImage.naturalWidth, sh = bgImage.naturalHeight;
-      if (imgRatio > canvasRatio) {
-        sw = bgImage.naturalHeight * canvasRatio;
-        sx = (bgImage.naturalWidth - sw) / 2;
-      } else {
-        sh = bgImage.naturalWidth / canvasRatio;
-        sy = (bgImage.naturalHeight - sh) / 2;
-      }
+      if (imgR > canR) { sw = bgImage.naturalHeight * canR; sx = (bgImage.naturalWidth - sw) / 2; }
+      else { sh = bgImage.naturalWidth / canR; sy = (bgImage.naturalHeight - sh) / 2; }
       ctx.drawImage(bgImage, sx, sy, sw, sh, 0, 0, width, height);
-      // Slight dark overlay for text readability
-      ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+      ctx.fillStyle = "rgba(0,0,0,0.3)";
       ctx.fillRect(0, 0, width, height);
       drewCustomBg = true;
     } else if (bgVideo && bgVideo.readyState >= 2) {
-      const vidRatio = bgVideo.videoWidth / bgVideo.videoHeight;
-      const canvasRatio = width / height;
+      const vidR = bgVideo.videoWidth / bgVideo.videoHeight;
+      const canR = width / height;
       let sx = 0, sy = 0, sw = bgVideo.videoWidth, sh = bgVideo.videoHeight;
-      if (vidRatio > canvasRatio) {
-        sw = bgVideo.videoHeight * canvasRatio;
-        sx = (bgVideo.videoWidth - sw) / 2;
-      } else {
-        sh = bgVideo.videoWidth / canvasRatio;
-        sy = (bgVideo.videoHeight - sh) / 2;
-      }
+      if (vidR > canR) { sw = bgVideo.videoHeight * canR; sx = (bgVideo.videoWidth - sw) / 2; }
+      else { sh = bgVideo.videoWidth / canR; sy = (bgVideo.videoHeight - sh) / 2; }
       ctx.drawImage(bgVideo, sx, sy, sw, sh, 0, 0, width, height);
-      ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+      ctx.fillStyle = "rgba(0,0,0,0.3)";
       ctx.fillRect(0, 0, width, height);
       drewCustomBg = true;
     }
 
     if (!drewCustomBg) {
-      // Animated gradient background
       const angle = 135 + Math.sin(phase * 0.02) * 30;
       const rad = (angle * Math.PI) / 180;
       const x1 = width / 2 - Math.cos(rad) * width;
@@ -246,35 +252,31 @@ export default function VideoCreator() {
       const x2 = width / 2 + Math.cos(rad) * width;
       const y2 = height / 2 + Math.sin(rad) * height;
 
-      // Parse gradient colors from script
-      const gradientStr = script?.gradient || GRADIENT_PRESETS[0];
-      const colorMatches = gradientStr.match(/#[0-9a-fA-F]{6}/g) || ["#667eea", "#764ba2"];
-      
+      const colorMatches = slideGradient.match(/#[0-9a-fA-F]{6}/g) || ["#667eea", "#764ba2"];
       const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
-      
       const hueShift = Math.sin(phase * 0.01) * 0.1;
       gradient.addColorStop(0, colorMatches[0]);
       gradient.addColorStop(0.5 + hueShift, colorMatches[1] || colorMatches[0]);
-      if (colorMatches[2]) gradient.addColorStop(1, colorMatches[2]);
-      else gradient.addColorStop(1, colorMatches[0]);
-
+      gradient.addColorStop(1, colorMatches[2] || colorMatches[0]);
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
 
-      // Animated particles/circles
       for (let i = 0; i < 6; i++) {
         const x = (width * (i + 1)) / 7 + Math.sin(phase * 0.015 + i) * 40;
         const y = (height * (i + 1)) / 7 + Math.cos(phase * 0.02 + i * 2) * 40;
         const r = 30 + Math.sin(phase * 0.03 + i) * 15;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.05 + Math.sin(phase * 0.02 + i) * 0.03})`;
+        ctx.fillStyle = `rgba(255,255,255,${0.05 + Math.sin(phase * 0.02 + i) * 0.03})`;
         ctx.fill();
       }
     }
 
-    // Text rendering with style options
-    const style = ts || { font: "system-ui, -apple-system, sans-serif", sizeMultiplier: 1, position: "center", animation: "fade", bold: true, color: "#ffffff" };
+    // ── Text ────────────────────────────────────────────────────────────
+    const style: TextStyle = ts || {
+      font: "system-ui, -apple-system, sans-serif", sizeMultiplier: 1,
+      position: "center", animation: "fade", bold: true, color: "#ffffff",
+    };
     const text = slide.text;
     const baseFontSize = Math.min(width, height) * 0.06;
     const fontSize = baseFontSize * style.sizeMultiplier;
@@ -282,103 +284,63 @@ export default function VideoCreator() {
     ctx.font = `${weight} ${fontSize}px ${style.font}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-
-    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
     ctx.shadowBlur = 20;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 4;
 
-    // Word wrap
     const maxWidth = width * 0.8;
     const words = text.split(" ");
     const lines: string[] = [];
-    let currentLine = "";
+    let cur = "";
     for (const word of words) {
-      const test = currentLine ? `${currentLine} ${word}` : word;
-      if (ctx.measureText(test).width > maxWidth && currentLine) {
-        lines.push(currentLine);
-        currentLine = word;
-      } else {
-        currentLine = test;
-      }
+      const test = cur ? `${cur} ${word}` : word;
+      if (ctx.measureText(test).width > maxWidth && cur) { lines.push(cur); cur = word; }
+      else cur = test;
     }
-    if (currentLine) lines.push(currentLine);
+    if (cur) lines.push(cur);
 
     const lineHeight = fontSize * 1.3;
     const totalHeight = lines.length * lineHeight;
-
-    // Position
     let baseY: number;
-    if (style.position === "top") {
-      baseY = height * 0.15 + lineHeight / 2;
-    } else if (style.position === "bottom") {
-      baseY = height * 0.7 - totalHeight / 2 + lineHeight / 2;
-    } else {
-      baseY = height / 2 - totalHeight / 2 + lineHeight / 2;
-    }
+    if (style.position === "top") baseY = height * 0.15 + lineHeight / 2;
+    else if (style.position === "bottom") baseY = height * 0.7 - totalHeight / 2 + lineHeight / 2;
+    else baseY = height / 2 - totalHeight / 2 + lineHeight / 2;
 
-    // Animation transforms
+    const slideDur = slide.duration || 3;
+    const elapsed = (progress || 0) * slideDur;
+    const fadeTime = 0.3;
     let textAlpha = opacity;
     let offsetY = 0;
     let scaleVal = 1;
-    const fadeTime = 0.3;
-    const slideDur = slide.duration || 3;
-    // Use progress if available, otherwise estimate from opacity
-    const elapsed = (progress || 0) * slideDur;
 
-    if (style.animation === "fade") {
-      textAlpha = opacity;
-    } else if (style.animation === "slide-up") {
-      if (elapsed < fadeTime) {
-        const t = elapsed / fadeTime;
-        textAlpha = t;
-        offsetY = (1 - t) * height * 0.05;
-      } else if (elapsed > slideDur - fadeTime) {
-        const t = Math.max(0, (slideDur - elapsed) / fadeTime);
-        textAlpha = t;
-        offsetY = -(1 - t) * height * 0.05;
-      }
+    if (style.animation === "slide-up") {
+      if (elapsed < fadeTime) { const t = elapsed / fadeTime; textAlpha = t; offsetY = (1 - t) * height * 0.05; }
+      else if (elapsed > slideDur - fadeTime) { const t = Math.max(0, (slideDur - elapsed) / fadeTime); textAlpha = t; offsetY = -(1 - t) * height * 0.05; }
     } else if (style.animation === "scale") {
-      if (elapsed < fadeTime) {
-        const t = elapsed / fadeTime;
-        textAlpha = t;
-        scaleVal = 0.7 + t * 0.3;
-      } else if (elapsed > slideDur - fadeTime) {
-        const t = Math.max(0, (slideDur - elapsed) / fadeTime);
-        textAlpha = t;
-        scaleVal = 0.7 + t * 0.3;
-      }
+      if (elapsed < fadeTime) { const t = elapsed / fadeTime; textAlpha = t; scaleVal = 0.7 + t * 0.3; }
+      else if (elapsed > slideDur - fadeTime) { const t = Math.max(0, (slideDur - elapsed) / fadeTime); textAlpha = t; scaleVal = 0.7 + t * 0.3; }
     } else if (style.animation === "typewriter") {
       const revealProgress = Math.min(elapsed / (slideDur * 0.6), 1);
-      const totalChars = text.length;
-      const visibleChars = Math.floor(revealProgress * totalChars);
-      // We'll handle typewriter in the draw loop below
-      ctx.globalAlpha = opacity;
-      ctx.fillStyle = style.color;
-      // Rebuild lines with visible chars only
+      const visibleChars = Math.floor(revealProgress * text.length);
       const visibleText = text.substring(0, visibleChars);
       const twWords = visibleText.split(" ");
       const twLines: string[] = [];
-      let twLine = "";
+      let twCur = "";
       for (const word of twWords) {
-        const test = twLine ? `${twLine} ${word}` : word;
-        if (ctx.measureText(test).width > maxWidth && twLine) {
-          twLines.push(twLine);
-          twLine = word;
-        } else {
-          twLine = test;
-        }
+        const test = twCur ? `${twCur} ${word}` : word;
+        if (ctx.measureText(test).width > maxWidth && twCur) { twLines.push(twCur); twCur = word; }
+        else twCur = test;
       }
-      if (twLine) twLines.push(twLine);
-      twLines.forEach((line, i) => {
-        ctx.fillText(line, width / 2, baseY + i * lineHeight);
-      });
+      if (twCur) twLines.push(twCur);
+      ctx.globalAlpha = opacity;
+      ctx.fillStyle = style.color;
+      twLines.forEach((line, i) => ctx.fillText(line, width / 2, baseY + i * lineHeight));
       ctx.globalAlpha = 1;
       ctx.shadowColor = "transparent";
       ctx.shadowBlur = 0;
     }
 
-    // Apply scale transform if needed
     if (style.animation !== "typewriter") {
       ctx.save();
       if (scaleVal !== 1) {
@@ -388,9 +350,7 @@ export default function VideoCreator() {
       }
       ctx.globalAlpha = textAlpha;
       ctx.fillStyle = style.color;
-      lines.forEach((line, i) => {
-        ctx.fillText(line, width / 2, baseY + offsetY + i * lineHeight);
-      });
+      lines.forEach((line, i) => ctx.fillText(line, width / 2, baseY + offsetY + i * lineHeight));
       ctx.restore();
     }
 
@@ -398,127 +358,102 @@ export default function VideoCreator() {
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;
 
-    // Waveform visualizer
+    // ── Waveform ────────────────────────────────────────────────────────
     if (renderWaveform && waveform && waveform.length > 0) {
       ctx.globalAlpha = 0.85;
-      const effectiveStyle = waveStyle || "bars";
+      const effStyle = waveStyle || "bars";
 
-      if (effectiveStyle === "bars") {
+      if (effStyle === "bars") {
         const barCount = 40;
-        const barWidth = (width * 0.6) / barCount;
-        const barGap = barWidth * 0.3;
-        const waveformY = height * 0.78;
-        const maxBarHeight = height * 0.08;
-        const waveformStartX = width * 0.2;
-
+        const barW = (width * 0.6) / barCount;
+        const barGap = barW * 0.3;
+        const wfY = height * 0.78;
+        const maxBarH = height * 0.08;
+        const startX = width * 0.2;
         for (let i = 0; i < barCount; i++) {
-          const dataIndex = Math.floor((i / barCount) * waveform.length);
-          const value = Math.abs(waveform[dataIndex] || 0);
-          const normalizedValue = Math.min(value / 128, 1);
-          const barHeight = Math.max(2, normalizedValue * maxBarHeight);
-          const x = waveformStartX + i * (barWidth + barGap);
-          const barProgress = i / barCount;
-          ctx.fillStyle = barProgress <= (progress || 0) ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.3)";
-          const radius = Math.min(barWidth / 2, 3);
-          const bx = x, by = waveformY - barHeight / 2, bw = barWidth, bh = barHeight;
+          const di = Math.floor((i / barCount) * waveform.length);
+          const nv = Math.min(Math.abs(waveform[di] || 0) / 128, 1);
+          const bh = Math.max(2, nv * maxBarH);
+          const x = startX + i * (barW + barGap);
+          ctx.fillStyle = (i / barCount) <= (progress || 0) ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.3)";
+          const r = Math.min(barW / 2, 3);
           ctx.beginPath();
-          ctx.moveTo(bx + radius, by);
-          ctx.lineTo(bx + bw - radius, by);
-          ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + radius);
-          ctx.lineTo(bx + bw, by + bh - radius);
-          ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - radius, by + bh);
-          ctx.lineTo(bx + radius, by + bh);
-          ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - radius);
-          ctx.lineTo(bx, by + radius);
-          ctx.quadraticCurveTo(bx, by, bx + radius, by);
+          ctx.moveTo(x + r, wfY - bh / 2);
+          ctx.lineTo(x + barW - r, wfY - bh / 2);
+          ctx.quadraticCurveTo(x + barW, wfY - bh / 2, x + barW, wfY - bh / 2 + r);
+          ctx.lineTo(x + barW, wfY + bh / 2 - r);
+          ctx.quadraticCurveTo(x + barW, wfY + bh / 2, x + barW - r, wfY + bh / 2);
+          ctx.lineTo(x + r, wfY + bh / 2);
+          ctx.quadraticCurveTo(x, wfY + bh / 2, x, wfY + bh / 2 - r);
+          ctx.lineTo(x, wfY - bh / 2 + r);
+          ctx.quadraticCurveTo(x, wfY - bh / 2, x + r, wfY - bh / 2);
           ctx.closePath();
           ctx.fill();
         }
-      } else if (effectiveStyle === "circular") {
-        const cx = width / 2;
-        const cy = height * 0.78;
-        const baseRadius = Math.min(width, height) * 0.06;
-        const maxExtension = Math.min(width, height) * 0.04;
-        const segmentCount = 48;
-
-        for (let i = 0; i < segmentCount; i++) {
-          const angle = (i / segmentCount) * Math.PI * 2 - Math.PI / 2;
-          const dataIndex = Math.floor((i / segmentCount) * waveform.length);
-          const value = Math.abs(waveform[dataIndex] || 0);
-          const normalizedValue = Math.min(value / 128, 1);
-          const ext = normalizedValue * maxExtension;
-          const segProgress = i / segmentCount;
-          ctx.strokeStyle = segProgress <= (progress || 0) ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.3)";
+      } else if (effStyle === "circular") {
+        const cx = width / 2, cy = height * 0.78;
+        const baseR = Math.min(width, height) * 0.06;
+        const maxExt = Math.min(width, height) * 0.04;
+        const segs = 48;
+        for (let i = 0; i < segs; i++) {
+          const angle = (i / segs) * Math.PI * 2 - Math.PI / 2;
+          const di = Math.floor((i / segs) * waveform.length);
+          const nv = Math.min(Math.abs(waveform[di] || 0) / 128, 1);
+          const ext = nv * maxExt;
+          ctx.strokeStyle = (i / segs) <= (progress || 0) ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.3)";
           ctx.lineWidth = 2.5;
           ctx.beginPath();
-          ctx.moveTo(cx + Math.cos(angle) * baseRadius, cy + Math.sin(angle) * baseRadius);
-          ctx.lineTo(cx + Math.cos(angle) * (baseRadius + ext), cy + Math.sin(angle) * (baseRadius + ext));
+          ctx.moveTo(cx + Math.cos(angle) * baseR, cy + Math.sin(angle) * baseR);
+          ctx.lineTo(cx + Math.cos(angle) * (baseR + ext), cy + Math.sin(angle) * (baseR + ext));
           ctx.stroke();
         }
-
-        // Inner circle
         ctx.beginPath();
-        ctx.arc(cx, cy, baseRadius * 0.85, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+        ctx.arc(cx, cy, baseR * 0.85, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255,255,255,0.25)";
         ctx.lineWidth = 1.5;
         ctx.stroke();
-      } else if (effectiveStyle === "line") {
-        const waveformY = height * 0.78;
-        const waveStartX = width * 0.15;
-        const waveEndX = width * 0.85;
-        const waveWidth = waveEndX - waveStartX;
-        const maxAmplitude = height * 0.04;
-        const pointCount = 60;
-
-        // Played portion
+      } else if (effStyle === "line") {
+        const wfY = height * 0.78;
+        const sX = width * 0.15, eX = width * 0.85;
+        const wW = eX - sX, maxAmp = height * 0.04, pts = 60;
+        const pEnd = Math.floor(pts * (progress || 0));
+        ctx.lineWidth = 2.5; ctx.lineJoin = "round"; ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-        ctx.lineWidth = 2.5;
-        ctx.lineJoin = "round";
-        ctx.lineCap = "round";
-        const progressEnd = Math.floor(pointCount * (progress || 0));
-
-        for (let i = 0; i <= progressEnd; i++) {
-          const x = waveStartX + (i / pointCount) * waveWidth;
-          const dataIndex = Math.floor((i / pointCount) * waveform.length);
-          const value = Math.abs(waveform[dataIndex] || 0);
-          const normalizedValue = Math.min(value / 128, 1);
-          const y = waveformY + (normalizedValue * maxAmplitude * (i % 2 === 0 ? -1 : 1));
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        for (let i = 0; i <= pEnd; i++) {
+          const x = sX + (i / pts) * wW;
+          const di = Math.floor((i / pts) * waveform.length);
+          const nv = Math.min(Math.abs(waveform[di] || 0) / 128, 1);
+          const y = wfY + nv * maxAmp * (i % 2 === 0 ? -1 : 1);
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.stroke();
-
-        // Unplayed portion
         ctx.beginPath();
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
-        for (let i = progressEnd; i <= pointCount; i++) {
-          const x = waveStartX + (i / pointCount) * waveWidth;
-          const dataIndex = Math.floor((i / pointCount) * waveform.length);
-          const value = Math.abs(waveform[dataIndex] || 0);
-          const normalizedValue = Math.min(value / 128, 1);
-          const y = waveformY + (normalizedValue * maxAmplitude * (i % 2 === 0 ? -1 : 1));
-          if (i === progressEnd) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        for (let i = pEnd; i <= pts; i++) {
+          const x = sX + (i / pts) * wW;
+          const di = Math.floor((i / pts) * waveform.length);
+          const nv = Math.min(Math.abs(waveform[di] || 0) / 128, 1);
+          const y = wfY + nv * maxAmp * (i % 2 === 0 ? -1 : 1);
+          if (i === pEnd) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.stroke();
-
-        // Progress dot
         if (progress && progress > 0) {
-          const dotX = waveStartX + (progress) * waveWidth;
-          const dotDataIndex = Math.floor(progress * waveform.length);
-          const dotValue = Math.abs(waveform[Math.min(dotDataIndex, waveform.length - 1)] || 0);
-          const dotY = waveformY + (Math.min(dotValue / 128, 1) * maxAmplitude * (Math.floor(progress * pointCount) % 2 === 0 ? -1 : 1));
-          ctx.beginPath();
-          ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
-          ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
-          ctx.fill();
+          const dx = sX + progress * wW;
+          const ddi = Math.floor(progress * waveform.length);
+          const dv = Math.min(Math.abs(waveform[Math.min(ddi, waveform.length - 1)] || 0) / 128, 1);
+          const dy = wfY + dv * maxAmp * (Math.floor(progress * pts) % 2 === 0 ? -1 : 1);
+          ctx.beginPath(); ctx.arc(dx, dy, 4, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255,255,255,0.95)"; ctx.fill();
         }
       }
 
       ctx.globalAlpha = 1;
     }
-  }, [script]);
+  }, []);
 
-  // Draw current frame
+  // ─── Draw current frame effect ─────────────────────────────────────────
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !script) return;
@@ -530,19 +465,25 @@ export default function VideoCreator() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    const slide = script.slides[currentSlide];
+    const bg = getSlideBg(slide, script.gradient);
+
     ctx.save();
     ctx.scale(previewScale, previewScale);
     const virtualCanvas = { width: ratio.width, height: ratio.height } as HTMLCanvasElement;
-    Object.defineProperty(ctx, 'canvas', { value: virtualCanvas, configurable: true });
+    Object.defineProperty(ctx, "canvas", { value: virtualCanvas, configurable: true });
     drawFrame(
-      ctx, script.slides[currentSlide], gradientPhase, textOpacity,
+      ctx, slide, gradientPhase, textOpacity,
       waveformData, playbackProgress, showWaveform, waveformStyle,
-      bgImageRef.current, bgVideoRef.current, textStyle
+      bg.type === "image" ? slideBgImagesRef.current.get(currentSlide) || null : null,
+      bg.type === "video" ? slideBgVideosRef.current.get(currentSlide) || null : null,
+      textStyle, bg.gradient,
     );
     ctx.restore();
-  }, [script, currentSlide, gradientPhase, textOpacity, drawFrame, ratio, waveformData, playbackProgress, showWaveform, bgType, bgMediaUrl, textStyle]);
+  }, [script, currentSlide, gradientPhase, textOpacity, drawFrame, ratio, waveformData, playbackProgress, showWaveform, textStyle, bgLoadTick, getSlideBg]);
 
-  // Animation loop for preview
+  // ─── Animation loop ────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!isPlaying || !script) return;
 
@@ -550,7 +491,6 @@ export default function VideoCreator() {
     let slideIndex = currentSlide;
     let phase = gradientPhase;
 
-    // Set up audio analyser for waveform visualization
     let audioCtx: AudioContext | null = null;
     let analyser: AnalyserNode | null = null;
     let frequencyData: Uint8Array<ArrayBuffer> | null = null;
@@ -566,33 +506,25 @@ export default function VideoCreator() {
         analyserRef.current = analyser;
       } catch { /* ignore */ }
     };
-
     setupAnalyser();
 
     const playSlideAudio = (index: number) => {
       const audioBlob = audioBlobs.get(index);
       if (!audioBlob) return;
-
       const url = URL.createObjectURL(audioBlob);
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      if (audioRef.current) audioRef.current.pause();
       const audio = new Audio(url);
       audioRef.current = audio;
-
-      // Connect to analyser if waveform is enabled
       if (showWaveform && audioCtx && analyser) {
         try {
           const source = audioCtx.createMediaElementSource(audio);
           source.connect(analyser);
           analyser.connect(audioCtx.destination);
-        } catch { /* already connected or error */ }
+        } catch { /* */ }
       }
-
       audio.play().catch(() => {});
     };
 
-    // Play first slide audio
     playSlideAudio(slideIndex);
 
     const animate = () => {
@@ -600,22 +532,16 @@ export default function VideoCreator() {
       const slideDuration = getSlideDuration(slideIndex);
       phase += 1;
 
-      // Progress within slide
       const progress = Math.min(elapsed / slideDuration, 1);
       setPlaybackProgress(progress);
 
-      // Read frequency data for waveform
       if (showWaveform && analyser && frequencyData) {
         analyser.getByteFrequencyData(frequencyData);
-        // Convert to Float32Array for drawFrame
         const floatData = new Float32Array(frequencyData.length);
-        for (let i = 0; i < frequencyData.length; i++) {
-          floatData[i] = frequencyData[i];
-        }
+        for (let i = 0; i < frequencyData.length; i++) floatData[i] = frequencyData[i];
         setWaveformData(floatData);
       }
 
-      // Text fade in/out
       let opacity = 1;
       const fadeTime = 0.3;
       if (elapsed < fadeTime) opacity = elapsed / fadeTime;
@@ -624,20 +550,19 @@ export default function VideoCreator() {
       setGradientPhase(phase);
       setTextOpacity(opacity);
 
-      // Move to next slide when duration is reached
       if (elapsed >= slideDuration) {
-        const nextIndex = slideIndex + 1;
-        if (nextIndex >= script.slides.length) {
+        const next = slideIndex + 1;
+        if (next >= script.slides.length) {
           setIsPlaying(false);
           setCurrentSlide(0);
           setWaveformData(null);
           setPlaybackProgress(0);
           return;
         }
-        slideIndex = nextIndex;
-        setCurrentSlide(nextIndex);
+        slideIndex = next;
+        setCurrentSlide(next);
         slideStartTime = Date.now();
-        playSlideAudio(nextIndex);
+        playSlideAudio(next);
       }
 
       animationRef.current = requestAnimationFrame(animate);
@@ -647,25 +572,19 @@ export default function VideoCreator() {
 
     return () => {
       cancelAnimationFrame(animationRef.current);
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      if (audioCtx) {
-        audioCtx.close().catch(() => {});
-        playbackAudioCtxRef.current = null;
-        analyserRef.current = null;
-      }
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      if (audioCtx) { audioCtx.close().catch(() => {}); playbackAudioCtxRef.current = null; analyserRef.current = null; }
       setWaveformData(null);
     };
   }, [isPlaying, getSlideDuration, showWaveform]);
+
+  // ─── Handlers ──────────────────────────────────────────────────────────
 
   const handleGenerateScript = async () => {
     if (!prompt.trim()) {
       toast({ title: "Enter a topic", description: "Describe what the video should be about.", variant: "destructive" });
       return;
     }
-
     setIsGeneratingScript(true);
     try {
       const { data, error } = await supabase.functions.invoke("generate-video-script", {
@@ -673,11 +592,20 @@ export default function VideoCreator() {
       });
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
-
-      setScript(data);
+      // Initialize per-slide bg from script gradient
+      const enriched: VideoScript = {
+        ...data,
+        slides: data.slides.map((s: Slide) => ({
+          ...s,
+          bg: { type: "gradient" as const, gradient: data.gradient },
+        })),
+      };
+      setScript(enriched);
       setCurrentSlide(0);
       setAudioBlobs(new Map());
       setAudioDurations(new Map());
+      slideBgImagesRef.current = new Map();
+      slideBgVideosRef.current = new Map();
       toast({ title: "Script generated!", description: `${data.slides.length} slides created.` });
     } catch (e) {
       toast({ title: "Generation failed", description: (e as Error).message, variant: "destructive" });
@@ -692,7 +620,6 @@ export default function VideoCreator() {
     setAudioProgress(0);
     const newBlobs = new Map<number, Blob>();
     const newDurations = new Map<number, number>();
-
     try {
       for (let i = 0; i < script.slides.length; i++) {
         setAudioProgress(i + 1);
@@ -705,29 +632,21 @@ export default function VideoCreator() {
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
               Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
             },
-            body: JSON.stringify({
-              text: script.slides[i].voiceover,
-              voiceId,
-            }),
+            body: JSON.stringify({ text: script.slides[i].voiceover, voiceId }),
           }
         );
-
         if (!response.ok) {
           const err = await response.json().catch(() => ({ error: "TTS failed" }));
           throw new Error(err.error || `TTS failed for slide ${i + 1}`);
         }
-
         const blob = await response.blob();
         newBlobs.set(i, blob);
-
-        // Measure actual audio duration
         const duration = await getAudioBlobDuration(blob);
         newDurations.set(i, duration);
       }
-
       setAudioBlobs(newBlobs);
       setAudioDurations(newDurations);
-      toast({ title: "Audio generated!", description: `${script.slides.length} voiceovers ready. Slide durations synced to audio.` });
+      toast({ title: "Audio generated!", description: `${script.slides.length} voiceovers ready.` });
     } catch (e) {
       toast({ title: "Audio generation failed", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -737,40 +656,24 @@ export default function VideoCreator() {
 
   const handleExportVideo = async () => {
     if (!script || !canvasRef.current) return;
-
     setIsRecording(true);
-    toast({ title: "Recording video…", description: "Please wait while the video is being recorded." });
+    toast({ title: "Recording video…", description: "Please wait." });
 
     try {
-      // Reset background video to start for export
-      if (bgVideoRef.current) {
-        bgVideoRef.current.currentTime = 0;
-        bgVideoRef.current.play().catch(() => {});
-      }
-      // Create a full-resolution offscreen canvas
       const offscreen = document.createElement("canvas");
       offscreen.width = ratio.width;
       offscreen.height = ratio.height;
       const offCtx = offscreen.getContext("2d")!;
-
       const stream = offscreen.captureStream(30);
-
-      // Mix audio if available
       const audioContext = new AudioContext();
       const destination = audioContext.createMediaStreamDestination();
       stream.addTrack(destination.stream.getAudioTracks()[0] || stream.getVideoTracks()[0]);
 
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-          ? "video/webm;codecs=vp9"
-          : "video/webm",
+        mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm",
       });
-
       recordedChunks.current = [];
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) recordedChunks.current.push(e.data);
-      };
-
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.current.push(e.data); };
       mediaRecorder.onstop = () => {
         const blob = new Blob(recordedChunks.current, { type: "video/webm" });
         const url = URL.createObjectURL(blob);
@@ -780,48 +683,49 @@ export default function VideoCreator() {
         a.click();
         URL.revokeObjectURL(url);
         setIsRecording(false);
-        toast({ title: "Video exported!", description: "Your video has been downloaded." });
+        toast({ title: "Video exported!" });
       };
-
       mediaRecorder.start();
 
-      // Record each slide
+      // Reset slide bg videos
+      slideBgVideosRef.current.forEach((v) => { v.currentTime = 0; v.play().catch(() => {}); });
+
       let phase = 0;
       for (let s = 0; s < script.slides.length; s++) {
         const slide = script.slides[s];
         const durationMs = getSlideDuration(s) * 1000;
         const startTime = Date.now();
+        const bg = getSlideBg(slide, script.gradient);
 
-        // Play audio for this slide
         const audioBlob = audioBlobs.get(s);
         if (audioBlob) {
-          const arrayBuffer = await audioBlob.arrayBuffer();
+          const ab = await audioBlob.arrayBuffer();
           try {
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            const source = audioContext.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(destination);
-            source.start();
-          } catch { /* audio decode error, skip */ }
+            const buf = await audioContext.decodeAudioData(ab);
+            const src = audioContext.createBufferSource();
+            src.buffer = buf;
+            src.connect(destination);
+            src.start();
+          } catch { /* */ }
         }
 
         while (Date.now() - startTime < durationMs) {
           const elapsed = (Date.now() - startTime) / 1000;
           phase += 1;
-
-          const slideDurSec = durationMs / 1000;
+          const durSec = durationMs / 1000;
           let opacity = 1;
           if (elapsed < 0.3) opacity = elapsed / 0.3;
-          else if (elapsed > slideDurSec - 0.3) opacity = Math.max(0, (slideDurSec - elapsed) / 0.3);
-
-          const exportProgress = elapsed / slideDurSec;
-          // Generate fake waveform bars for export if waveform enabled
+          else if (elapsed > durSec - 0.3) opacity = Math.max(0, (durSec - elapsed) / 0.3);
+          const exportProgress = elapsed / durSec;
           const exportWaveform = showWaveform ? new Float32Array(64).map(() => Math.random() * 180 + 20) : null;
           drawFrame(
             offCtx, slide, phase, opacity, exportWaveform, exportProgress,
-            showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.current, textStyle
+            showWaveform, waveformStyle,
+            bg.type === "image" ? slideBgImagesRef.current.get(s) || null : null,
+            bg.type === "video" ? slideBgVideosRef.current.get(s) || null : null,
+            textStyle, bg.gradient,
           );
-          await new Promise(r => setTimeout(r, 33)); // ~30fps
+          await new Promise(r => setTimeout(r, 33));
         }
       }
 
@@ -840,71 +744,133 @@ export default function VideoCreator() {
 
   const handleEditSlideText = (index: number, text: string) => {
     if (!script) return;
-    const updated = { ...script, slides: script.slides.map((s, i) => i === index ? { ...s, text } : s) };
-    setScript(updated);
+    setScript({ ...script, slides: script.slides.map((s, i) => i === index ? { ...s, text } : s) });
   };
 
   const handleEditSlideVoiceover = (index: number, voiceover: string) => {
     if (!script) return;
-    const updated = { ...script, slides: script.slides.map((s, i) => i === index ? { ...s, voiceover } : s) };
-    setScript(updated);
+    setScript({ ...script, slides: script.slides.map((s, i) => i === index ? { ...s, voiceover } : s) });
   };
 
-  const handleGradientChange = (gradient: string) => {
+  /** Set a gradient preset for a specific slide */
+  const handleSlideGradientChange = (slideIndex: number, gradient: string) => {
     if (!script) return;
-    setBgType("gradient");
-    setBgMediaUrl(null);
-    bgImageRef.current = null;
-    bgVideoRef.current = null;
-    setScript({ ...script, gradient });
+    // Clear any media for this slide
+    const oldUrl = script.slides[slideIndex]?.bg?.mediaUrl;
+    if (oldUrl) URL.revokeObjectURL(oldUrl);
+    slideBgImagesRef.current.delete(slideIndex);
+    const vid = slideBgVideosRef.current.get(slideIndex);
+    if (vid) { vid.pause(); slideBgVideosRef.current.delete(slideIndex); }
+
+    setScript({
+      ...script,
+      slides: script.slides.map((s, i) =>
+        i === slideIndex ? { ...s, bg: { type: "gradient", gradient } } : s
+      ),
+    });
   };
 
-  const handleBgFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  /** Apply a gradient to ALL slides */
+  const handleApplyGradientToAll = (gradient: string) => {
+    if (!script) return;
+    // Clear all media
+    script.slides.forEach((s, i) => {
+      if (s.bg?.mediaUrl) URL.revokeObjectURL(s.bg.mediaUrl);
+      slideBgImagesRef.current.delete(i);
+      const vid = slideBgVideosRef.current.get(i);
+      if (vid) { vid.pause(); slideBgVideosRef.current.delete(i); }
+    });
+    setScript({
+      ...script,
+      gradient,
+      slides: script.slides.map((s) => ({ ...s, bg: { type: "gradient", gradient } })),
+    });
+  };
 
-    // Revoke old URL
-    if (bgMediaUrl) URL.revokeObjectURL(bgMediaUrl);
+  /** Handle per-slide file upload */
+  const handleSlideBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || editingBgSlide === null || !script) return;
+    const idx = editingBgSlide;
+
+    // Revoke old
+    const old = script.slides[idx]?.bg?.mediaUrl;
+    if (old) URL.revokeObjectURL(old);
 
     const url = URL.createObjectURL(file);
-    setBgMediaUrl(url);
 
     if (file.type.startsWith("image/")) {
-      setBgType("image");
-      bgVideoRef.current = null;
+      slideBgVideosRef.current.delete(idx);
       const img = new Image();
-      img.onload = () => { bgImageRef.current = img; };
+      img.onload = () => {
+        slideBgImagesRef.current.set(idx, img);
+        setBgLoadTick((t) => t + 1);
+      };
       img.src = url;
+      setScript({
+        ...script,
+        slides: script.slides.map((s, i) =>
+          i === idx ? { ...s, bg: { type: "image", gradient: s.bg?.gradient || script.gradient, mediaUrl: url } } : s
+        ),
+      });
     } else if (file.type.startsWith("video/")) {
-      setBgType("video");
-      bgImageRef.current = null;
+      slideBgImagesRef.current.delete(idx);
       const video = document.createElement("video");
       video.src = url;
       video.loop = true;
       video.muted = true;
       video.playsInline = true;
       video.play().catch(() => {});
-      bgVideoRef.current = video;
+      video.addEventListener("loadeddata", () => setBgLoadTick((t) => t + 1));
+      slideBgVideosRef.current.set(idx, video);
+      setScript({
+        ...script,
+        slides: script.slides.map((s, i) =>
+          i === idx ? { ...s, bg: { type: "video", gradient: s.bg?.gradient || script.gradient, mediaUrl: url } } : s
+        ),
+      });
     }
+
+    // Reset input
+    if (slideBgFileInputRef.current) slideBgFileInputRef.current.value = "";
+    setEditingBgSlide(null);
   };
 
-  const handleClearBgMedia = () => {
-    if (bgMediaUrl) URL.revokeObjectURL(bgMediaUrl);
-    setBgType("gradient");
-    setBgMediaUrl(null);
-    bgImageRef.current = null;
-    if (bgVideoRef.current) {
-      bgVideoRef.current.pause();
-      bgVideoRef.current = null;
-    }
+  /** Clear per-slide media (revert to gradient) */
+  const handleClearSlideBg = (idx: number) => {
+    if (!script) return;
+    const old = script.slides[idx]?.bg?.mediaUrl;
+    if (old) URL.revokeObjectURL(old);
+    slideBgImagesRef.current.delete(idx);
+    const vid = slideBgVideosRef.current.get(idx);
+    if (vid) { vid.pause(); slideBgVideosRef.current.delete(idx); }
+    setScript({
+      ...script,
+      slides: script.slides.map((s, i) =>
+        i === idx ? { ...s, bg: { type: "gradient", gradient: s.bg?.gradient || script.gradient } } : s
+      ),
+    });
+    setBgLoadTick((t) => t + 1);
   };
 
-  // Preview canvas dimensions
+  // ─── Preview dimensions ────────────────────────────────────────────────
+
   const previewMaxHeight = 480;
   const previewWidth = (ratio.width / ratio.height) * previewMaxHeight;
 
+  // ─── Render ────────────────────────────────────────────────────────────
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Hidden file input for per-slide bg uploads */}
+      <input
+        ref={slideBgFileInputRef}
+        type="file"
+        accept="image/*,video/mp4,video/webm"
+        className="hidden"
+        onChange={handleSlideBgUpload}
+      />
+
       {/* Left: Controls */}
       <Card>
         <CardContent className="p-6 space-y-4">
@@ -973,12 +939,11 @@ export default function VideoCreator() {
             </>
           ) : (
             <>
-              {/* Script editor */}
+              {/* Script editor header */}
               <div className="flex items-center justify-between">
                 <h4 className="font-medium text-sm">{script.title}</h4>
                 <Button
-                  variant="ghost"
-                  size="sm"
+                  variant="ghost" size="sm"
                   onClick={() => { setScript(null); setAudioBlobs(new Map()); }}
                   className="gap-1"
                 >
@@ -986,80 +951,21 @@ export default function VideoCreator() {
                 </Button>
               </div>
 
-              {/* Background selector */}
+              {/* Global gradient (apply to all) */}
               <div className="space-y-2">
-                <Label className="text-xs">Background</Label>
-
-                {/* Upload controls */}
-                <div className="flex gap-2 items-center mb-2">
-                  <input
-                    ref={bgFileInputRef}
-                    type="file"
-                    accept="image/*,video/mp4,video/webm"
-                    className="hidden"
-                    onChange={handleBgFileUpload}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 text-xs h-7"
-                    onClick={() => bgFileInputRef.current?.click()}
-                  >
-                    <ImagePlus className="h-3.5 w-3.5" /> Image
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 text-xs h-7"
-                    onClick={() => {
-                      if (bgFileInputRef.current) {
-                        bgFileInputRef.current.accept = "video/mp4,video/webm,video/quicktime";
-                        bgFileInputRef.current.click();
-                        // Reset accept after
-                        setTimeout(() => {
-                          if (bgFileInputRef.current) bgFileInputRef.current.accept = "image/*,video/mp4,video/webm";
-                        }, 100);
-                      }
-                    }}
-                  >
-                    <VideoIcon className="h-3.5 w-3.5" /> Video
-                  </Button>
-                  {bgMediaUrl && (
-                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleClearBgMedia}>
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
+                <Label className="text-xs">Default Background (apply to all)</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {GRADIENT_PRESETS.map((g, i) => (
+                    <button
+                      key={i}
+                      className={`w-7 h-7 rounded-md border-2 transition-all ${
+                        script.gradient === g ? "border-primary scale-110" : "border-transparent"
+                      }`}
+                      style={{ background: g }}
+                      onClick={() => handleApplyGradientToAll(g)}
+                    />
+                  ))}
                 </div>
-
-                {/* Media preview thumbnail */}
-                {bgMediaUrl && bgType === "image" && (
-                  <div className="relative w-16 h-16 rounded-md overflow-hidden border border-primary">
-                    <img src={bgMediaUrl} alt="Background" className="w-full h-full object-cover" />
-                    <Badge className="absolute bottom-0 left-0 text-[8px] rounded-none">IMG</Badge>
-                  </div>
-                )}
-                {bgMediaUrl && bgType === "video" && (
-                  <div className="relative w-16 h-16 rounded-md overflow-hidden border border-primary bg-muted flex items-center justify-center">
-                    <VideoIcon className="h-5 w-5 text-muted-foreground" />
-                    <Badge className="absolute bottom-0 left-0 text-[8px] rounded-none">VID</Badge>
-                  </div>
-                )}
-
-                {/* Gradient presets (always available as fallback) */}
-                {bgType === "gradient" && (
-                  <div className="flex gap-2 flex-wrap">
-                    {GRADIENT_PRESETS.map((g, i) => (
-                      <button
-                        key={i}
-                        className={`w-8 h-8 rounded-md border-2 transition-all ${
-                          script.gradient === g && bgType === "gradient" ? "border-primary scale-110" : "border-transparent"
-                        }`}
-                        style={{ background: g }}
-                        onClick={() => handleGradientChange(g)}
-                      />
-                    ))}
-                  </div>
-                )}
               </div>
 
               {/* Text Styling */}
@@ -1068,7 +974,6 @@ export default function VideoCreator() {
                   <Type className="h-4 w-4 text-muted-foreground" />
                   <Label className="text-xs font-medium">Text Styling</Label>
                 </div>
-
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <Label className="text-[10px] text-muted-foreground">Font</Label>
@@ -1093,19 +998,15 @@ export default function VideoCreator() {
                     </Select>
                   </div>
                 </div>
-
                 <div className="space-y-1">
                   <Label className="text-[10px] text-muted-foreground">Size ({Math.round(textStyle.sizeMultiplier * 100)}%)</Label>
                   <Slider
                     value={[textStyle.sizeMultiplier]}
-                    min={0.5}
-                    max={1.8}
-                    step={0.1}
+                    min={0.5} max={1.8} step={0.1}
                     onValueChange={([v]) => setTextStyle(s => ({ ...s, sizeMultiplier: v }))}
                     className="py-1"
                   />
                 </div>
-
                 <div className="space-y-1">
                   <Label className="text-[10px] text-muted-foreground">Animation</Label>
                   <div className="flex gap-1 flex-wrap">
@@ -1124,20 +1025,15 @@ export default function VideoCreator() {
                     ))}
                   </div>
                 </div>
-
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5">
-                    <Switch
-                      checked={textStyle.bold}
-                      onCheckedChange={(v) => setTextStyle(s => ({ ...s, bold: v }))}
-                    />
+                    <Switch checked={textStyle.bold} onCheckedChange={(v) => setTextStyle(s => ({ ...s, bold: v }))} />
                     <Label className="text-[10px]">Bold</Label>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Label className="text-[10px]">Color</Label>
                     <input
-                      type="color"
-                      value={textStyle.color}
+                      type="color" value={textStyle.color}
                       onChange={(e) => setTextStyle(s => ({ ...s, color: e.target.value }))}
                       className="w-6 h-6 rounded border border-border cursor-pointer"
                     />
@@ -1146,36 +1042,115 @@ export default function VideoCreator() {
               </div>
 
               {/* Slide editor */}
-              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                {script.slides.map((slide, i) => (
-                  <div
-                    key={i}
-                    className={`p-3 rounded-lg border transition-colors cursor-pointer ${
-                      currentSlide === i ? "border-primary bg-primary/5" : "border-border"
-                    }`}
-                    onClick={() => handleSlideChange(i)}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="secondary" className="text-[10px]">Slide {i + 1}</Badge>
-                      <span className="text-[10px] text-muted-foreground">
-                        {audioDurations.has(i) ? `${getSlideDuration(i).toFixed(1)}s (audio: ${audioDurations.get(i)!.toFixed(1)}s)` : `${slide.duration}s`}
-                      </span>
-                      {audioBlobs.has(i) && <Volume2 className="h-3 w-3 text-green-600" />}
+              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                {script.slides.map((slide, i) => {
+                  const bg = getSlideBg(slide, script.gradient);
+                  return (
+                    <div
+                      key={i}
+                      className={`p-3 rounded-lg border transition-colors cursor-pointer ${
+                        currentSlide === i ? "border-primary bg-primary/5" : "border-border"
+                      }`}
+                      onClick={() => handleSlideChange(i)}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="secondary" className="text-[10px]">Slide {i + 1}</Badge>
+                        <span className="text-[10px] text-muted-foreground">
+                          {audioDurations.has(i)
+                            ? `${getSlideDuration(i).toFixed(1)}s (audio: ${audioDurations.get(i)!.toFixed(1)}s)`
+                            : `${slide.duration}s`}
+                        </span>
+                        {audioBlobs.has(i) && <Volume2 className="h-3 w-3 text-green-600" />}
+                      </div>
+                      <Input
+                        value={slide.text}
+                        onChange={(e) => handleEditSlideText(i, e.target.value)}
+                        className="text-xs h-7 mb-1"
+                        placeholder="On-screen text"
+                      />
+                      <Input
+                        value={slide.voiceover}
+                        onChange={(e) => handleEditSlideVoiceover(i, e.target.value)}
+                        className="text-xs h-7 text-muted-foreground mb-2"
+                        placeholder="Voiceover text"
+                      />
+
+                      {/* Per-slide background controls */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Gradient swatches for this slide */}
+                        {GRADIENT_PRESETS.slice(0, 4).map((g, gi) => (
+                          <button
+                            key={gi}
+                            className={`w-5 h-5 rounded border transition-all ${
+                              bg.type === "gradient" && bg.gradient === g ? "border-primary scale-110" : "border-transparent"
+                            }`}
+                            style={{ background: g }}
+                            onClick={(e) => { e.stopPropagation(); handleSlideGradientChange(i, g); }}
+                            title={`Gradient ${gi + 1}`}
+                          />
+                        ))}
+                        {/* More gradients dropdown-like: show remaining on hover? Just show all 8 compactly */}
+                        {GRADIENT_PRESETS.slice(4).map((g, gi) => (
+                          <button
+                            key={gi + 4}
+                            className={`w-5 h-5 rounded border transition-all ${
+                              bg.type === "gradient" && bg.gradient === g ? "border-primary scale-110" : "border-transparent"
+                            }`}
+                            style={{ background: g }}
+                            onClick={(e) => { e.stopPropagation(); handleSlideGradientChange(i, g); }}
+                            title={`Gradient ${gi + 5}`}
+                          />
+                        ))}
+
+                        {/* Upload image/video for this slide */}
+                        <button
+                          className="w-5 h-5 rounded border border-dashed border-muted-foreground/40 flex items-center justify-center hover:border-primary transition-colors"
+                          title="Upload image"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingBgSlide(i);
+                            if (slideBgFileInputRef.current) {
+                              slideBgFileInputRef.current.accept = "image/*";
+                              slideBgFileInputRef.current.click();
+                            }
+                          }}
+                        >
+                          <ImagePlus className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                        <button
+                          className="w-5 h-5 rounded border border-dashed border-muted-foreground/40 flex items-center justify-center hover:border-primary transition-colors"
+                          title="Upload video"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingBgSlide(i);
+                            if (slideBgFileInputRef.current) {
+                              slideBgFileInputRef.current.accept = "video/mp4,video/webm,video/quicktime";
+                              slideBgFileInputRef.current.click();
+                            }
+                          }}
+                        >
+                          <VideoIcon className="h-3 w-3 text-muted-foreground" />
+                        </button>
+
+                        {/* Show media indicator & clear button */}
+                        {bg.type !== "gradient" && (
+                          <div className="flex items-center gap-1 ml-1">
+                            <Badge variant="outline" className="text-[8px] h-4 px-1">
+                              {bg.type === "image" ? "IMG" : "VID"}
+                            </Badge>
+                            <button
+                              className="text-muted-foreground hover:text-destructive transition-colors"
+                              onClick={(e) => { e.stopPropagation(); handleClearSlideBg(i); }}
+                              title="Remove media"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <Input
-                      value={slide.text}
-                      onChange={(e) => handleEditSlideText(i, e.target.value)}
-                      className="text-xs h-7 mb-1"
-                      placeholder="On-screen text"
-                    />
-                    <Input
-                      value={slide.voiceover}
-                      onChange={(e) => handleEditSlideVoiceover(i, e.target.value)}
-                      className="text-xs h-7 text-muted-foreground"
-                      placeholder="Voiceover text"
-                    />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Voice selector */}
@@ -1198,10 +1173,7 @@ export default function VideoCreator() {
                     <AudioWaveform className="h-4 w-4 text-muted-foreground" />
                     <Label className="text-xs">Waveform Visualizer</Label>
                   </div>
-                  <Switch
-                    checked={showWaveform}
-                    onCheckedChange={setShowWaveform}
-                  />
+                  <Switch checked={showWaveform} onCheckedChange={setShowWaveform} />
                 </div>
                 {showWaveform && (
                   <div className="flex gap-1.5">
@@ -1209,17 +1181,17 @@ export default function VideoCreator() {
                       { value: "bars" as const, label: "Bars" },
                       { value: "circular" as const, label: "Circular" },
                       { value: "line" as const, label: "Line" },
-                    ]).map(style => (
+                    ]).map(s => (
                       <button
-                        key={style.value}
-                        onClick={() => setWaveformStyle(style.value)}
+                        key={s.value}
+                        onClick={() => setWaveformStyle(s.value)}
                         className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                          waveformStyle === style.value
+                          waveformStyle === s.value
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted text-muted-foreground hover:bg-accent"
                         }`}
                       >
-                        {style.label}
+                        {s.label}
                       </button>
                     ))}
                   </div>
@@ -1240,7 +1212,6 @@ export default function VideoCreator() {
                     <><Volume2 className="h-4 w-4" /> {audioBlobs.size > 0 ? "Regenerate" : "Generate"} Voiceover</>
                   )}
                 </Button>
-
                 <Button
                   onClick={handleExportVideo}
                   disabled={isRecording}
@@ -1273,38 +1244,28 @@ export default function VideoCreator() {
               {/* Playback controls */}
               <div className="flex items-center gap-3 mt-4">
                 <Button
-                  variant="ghost"
-                  size="icon"
+                  variant="ghost" size="icon"
                   onClick={() => handleSlideChange(currentSlide - 1)}
                   disabled={currentSlide === 0 || isPlaying}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-
                 <Button
-                  variant="outline"
-                  size="icon"
+                  variant="outline" size="icon"
                   onClick={() => {
-                    if (isPlaying) {
-                      setIsPlaying(false);
-                    } else {
-                      setCurrentSlide(0);
-                      setIsPlaying(true);
-                    }
+                    if (isPlaying) setIsPlaying(false);
+                    else { setCurrentSlide(0); setIsPlaying(true); }
                   }}
                 >
                   {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                 </Button>
-
                 <Button
-                  variant="ghost"
-                  size="icon"
+                  variant="ghost" size="icon"
                   onClick={() => handleSlideChange(currentSlide + 1)}
                   disabled={currentSlide >= script.slides.length - 1 || isPlaying}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
-
                 <span className="text-xs text-muted-foreground ml-2">
                   {currentSlide + 1} / {script.slides.length}
                 </span>
