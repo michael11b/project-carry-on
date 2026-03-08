@@ -184,6 +184,12 @@ export default function VideoCreator() {
   const [bgMusicName, setBgMusicName] = useState<string>("");
   const bgMusicAudioRef = useRef<HTMLAudioElement | null>(null);
   const bgMusicFileInputRef = useRef<HTMLInputElement>(null);
+  const [bgMusicDuration, setBgMusicDuration] = useState(0);
+  const [bgMusicTrimStart, setBgMusicTrimStart] = useState(0);
+  const [bgMusicTrimEnd, setBgMusicTrimEnd] = useState(0); // 0 means full duration
+  const [bgMusicLoop, setBgMusicLoop] = useState(true);
+  const [bgMusicFadeIn, setBgMusicFadeIn] = useState(1.5);
+  const [bgMusicFadeOut, setBgMusicFadeOut] = useState(2.0);
 
   // Transition state
   const [transitionType, setTransitionType] = useState<TransitionType>("crossfade");
