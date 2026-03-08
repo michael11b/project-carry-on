@@ -737,7 +737,24 @@ export default function Studio() {
         </TabsContent>
 
         <TabsContent value="video">
-          <VideoCreator />
+          <Tabs defaultValue="slides" className="space-y-4">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="slides" className="gap-2">
+                <Film className="h-4 w-4" />
+                <span>Slides</span>
+              </TabsTrigger>
+              <TabsTrigger value="word-highlight" className="gap-2">
+                <Type className="h-4 w-4" />
+                <span>Word Highlight</span>
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="slides">
+              <VideoCreator />
+            </TabsContent>
+            <TabsContent value="word-highlight">
+              <WordHighlightCreator />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="audio">
