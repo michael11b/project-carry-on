@@ -257,19 +257,27 @@ export default function Studio() {
         }
       : undefined;
 
-    // Build prompt with page profile context for images
+    // Build page context for images
     const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
-    let fullImagePrompt = imagePrompt.trim();
-    if (selectedPage?.system_prompt) {
-      fullImagePrompt = `${selectedPage.system_prompt}\n\n---\nImage request: ${fullImagePrompt}`;
+    let contentType: string | undefined;
+    if (selectedPage) {
+      contentType = "facebook_post_image";
     }
+
+    const pageContext = selectedPage ? {
+      page_name: selectedPage.page_name,
+      description: selectedPage.description,
+      content_tone: selectedPage.content_tone,
+    } : undefined;
 
     try {
       const { data, error } = await supabase.functions.invoke("generate-image", {
         body: {
-          prompt: fullImagePrompt,
+          prompt: imagePrompt.trim(),
           brandStyle,
           platform: imagePlatform || undefined,
+          contentType,
+          pageContext,
         },
       });
 
