@@ -298,6 +298,13 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
+                          {post.published_fb_id && post.facebook_page_id && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild title="View on Facebook">
+                              <a href={`https://facebook.com/${post.published_fb_id}`} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          )}
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewPost(post)} title="View">
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -361,8 +368,15 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
             </div>
             {viewPost?.published_fb_id && (
               <div>
-                <Label className="text-xs text-muted-foreground">Published ID</Label>
-                <p className="text-sm font-mono">{viewPost.published_fb_id}</p>
+                <Label className="text-xs text-muted-foreground">Published on Facebook</Label>
+                <a
+                  href={`https://facebook.com/${viewPost.published_fb_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary hover:underline inline-flex items-center gap-1 mt-1"
+                >
+                  View on Facebook <ExternalLink className="h-3 w-3" />
+                </a>
               </div>
             )}
             {viewPost?.publish_error && (
