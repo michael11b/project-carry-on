@@ -1062,6 +1062,89 @@ export default function VideoCreator() {
                 )}
               </div>
 
+              {/* Text Styling */}
+              <div className="space-y-3 border border-border rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <Type className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-xs font-medium">Text Styling</Label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Font</Label>
+                    <Select value={textStyle.font} onValueChange={(v) => setTextStyle(s => ({ ...s, font: v }))}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {FONT_OPTIONS.map(f => (
+                          <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Position</Label>
+                    <Select value={textStyle.position} onValueChange={(v) => setTextStyle(s => ({ ...s, position: v as TextStyle["position"] }))}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TEXT_POSITIONS.map(p => (
+                          <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Size ({Math.round(textStyle.sizeMultiplier * 100)}%)</Label>
+                  <Slider
+                    value={[textStyle.sizeMultiplier]}
+                    min={0.5}
+                    max={1.8}
+                    step={0.1}
+                    onValueChange={([v]) => setTextStyle(s => ({ ...s, sizeMultiplier: v }))}
+                    className="py-1"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Animation</Label>
+                  <div className="flex gap-1 flex-wrap">
+                    {TEXT_ANIMATIONS.map(a => (
+                      <button
+                        key={a.value}
+                        onClick={() => setTextStyle(s => ({ ...s, animation: a.value as TextStyle["animation"] }))}
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                          textStyle.animation === a.value
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <Switch
+                      checked={textStyle.bold}
+                      onCheckedChange={(v) => setTextStyle(s => ({ ...s, bold: v }))}
+                    />
+                    <Label className="text-[10px]">Bold</Label>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-[10px]">Color</Label>
+                    <input
+                      type="color"
+                      value={textStyle.color}
+                      onChange={(e) => setTextStyle(s => ({ ...s, color: e.target.value }))}
+                      className="w-6 h-6 rounded border border-border cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Slide editor */}
               <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                 {script.slides.map((slide, i) => (
