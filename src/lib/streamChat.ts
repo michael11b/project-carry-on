@@ -21,6 +21,8 @@ export async function streamGenerate({
   brandVoice,
   channel,
   variantCount,
+  contentType,
+  pageContext,
   onDelta,
   onDone,
   onError,
