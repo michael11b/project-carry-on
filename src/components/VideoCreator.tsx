@@ -135,7 +135,15 @@ export default function VideoCreator() {
   }, [audioDurations, script]);
 
   // Canvas rendering
-  const drawFrame = useCallback((ctx: CanvasRenderingContext2D, slide: Slide, phase: number, opacity: number) => {
+  const drawFrame = useCallback((
+    ctx: CanvasRenderingContext2D,
+    slide: Slide,
+    phase: number,
+    opacity: number,
+    waveform?: Float32Array | null,
+    progress?: number,
+    renderWaveform?: boolean,
+  ) => {
     const { width, height } = ctx.canvas;
 
     // Animated gradient background
@@ -152,7 +160,6 @@ export default function VideoCreator() {
     
     const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
     
-    // Shift colors slightly based on phase
     const hueShift = Math.sin(phase * 0.01) * 0.1;
     gradient.addColorStop(0, colorMatches[0]);
     gradient.addColorStop(0.5 + hueShift, colorMatches[1] || colorMatches[0]);
@@ -181,7 +188,6 @@ export default function VideoCreator() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    // Text shadow
     ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
     ctx.shadowBlur = 20;
     ctx.shadowOffsetX = 0;
@@ -207,7 +213,6 @@ export default function VideoCreator() {
     const totalHeight = lines.length * lineHeight;
     const startY = height / 2 - totalHeight / 2 + lineHeight / 2;
 
-    // Draw text
     ctx.fillStyle = "#ffffff";
     lines.forEach((line, i) => {
       ctx.fillText(line, width / 2, startY + i * lineHeight);
@@ -216,6 +221,61 @@ export default function VideoCreator() {
     ctx.globalAlpha = 1;
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;
+
+    // Waveform visualizer
+    if (renderWaveform && waveform && waveform.length > 0) {
+      const barCount = 40;
+      const barWidth = (width * 0.6) / barCount;
+      const barGap = barWidth * 0.3;
+      const waveformY = height * 0.78;
+      const maxBarHeight = height * 0.08;
+      const waveformStartX = width * 0.2;
+
+      ctx.globalAlpha = 0.85;
+
+      for (let i = 0; i < barCount; i++) {
+        // Sample from the waveform data
+        const dataIndex = Math.floor((i / barCount) * waveform.length);
+        // Normalize: waveform values are typically -1 to 1 or 0-255 depending on type
+        const value = Math.abs(waveform[dataIndex] || 0);
+        const normalizedValue = Math.min(value / 128, 1); // For byte frequency data (0-255)
+        const barHeight = Math.max(2, normalizedValue * maxBarHeight);
+
+        const x = waveformStartX + i * (barWidth + barGap);
+
+        // Color: bars before progress are brighter, after are dimmer
+        const progressX = (progress || 0);
+        const barProgress = i / barCount;
+        
+        if (barProgress <= progressX) {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        } else {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+        }
+
+        // Rounded bars
+        const radius = Math.min(barWidth / 2, 3);
+        const bx = x;
+        const by = waveformY - barHeight / 2;
+        const bw = barWidth;
+        const bh = barHeight;
+        
+        ctx.beginPath();
+        ctx.moveTo(bx + radius, by);
+        ctx.lineTo(bx + bw - radius, by);
+        ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + radius);
+        ctx.lineTo(bx + bw, by + bh - radius);
+        ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - radius, by + bh);
+        ctx.lineTo(bx + radius, by + bh);
+        ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - radius);
+        ctx.lineTo(bx, by + radius);
+        ctx.quadraticCurveTo(bx, by, bx + radius, by);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 1;
+    }
   }, [script]);
 
   // Draw current frame
