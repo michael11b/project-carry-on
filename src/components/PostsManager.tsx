@@ -341,9 +341,34 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
         </CardContent>
       </Card>
 
-      <p className="text-xs text-muted-foreground">
-        Showing {filteredPosts.length} of {posts.length} posts
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Showing {filteredPosts.length} of {totalCount} posts
+        </p>
+        {totalCount > PAGE_SIZE && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0 || loading}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page + 1} of {Math.ceil(totalCount / PAGE_SIZE)}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={(page + 1) * PAGE_SIZE >= totalCount || loading}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* View Dialog */}
       <Dialog open={!!viewPost} onOpenChange={() => setViewPost(null)}>
