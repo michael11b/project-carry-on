@@ -10,8 +10,9 @@ import {
 } from "@/components/ui/select";
 import {
   Sparkles, Loader2, Play, Pause, Download, Film,
-  ChevronLeft, ChevronRight, RotateCcw, Volume2,
+  ChevronLeft, ChevronRight, RotateCcw, Volume2, AudioWaveform,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -81,6 +82,11 @@ export default function VideoCreator() {
   const [isRecording, setIsRecording] = useState(false);
   const [textOpacity, setTextOpacity] = useState(1);
   const [gradientPhase, setGradientPhase] = useState(0);
+  const [showWaveform, setShowWaveform] = useState(false);
+  const [waveformData, setWaveformData] = useState<Float32Array | null>(null);
+  const [playbackProgress, setPlaybackProgress] = useState(0); // 0-1 progress within current slide
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const playbackAudioCtxRef = useRef<AudioContext | null>(null);
 
   // Recording state
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -129,7 +135,15 @@ export default function VideoCreator() {
   }, [audioDurations, script]);
 
   // Canvas rendering
-  const drawFrame = useCallback((ctx: CanvasRenderingContext2D, slide: Slide, phase: number, opacity: number) => {
+  const drawFrame = useCallback((
+    ctx: CanvasRenderingContext2D,
+    slide: Slide,
+    phase: number,
+    opacity: number,
+    waveform?: Float32Array | null,
+    progress?: number,
+    renderWaveform?: boolean,
+  ) => {
     const { width, height } = ctx.canvas;
 
     // Animated gradient background
@@ -146,7 +160,6 @@ export default function VideoCreator() {
     
     const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
     
-    // Shift colors slightly based on phase
     const hueShift = Math.sin(phase * 0.01) * 0.1;
     gradient.addColorStop(0, colorMatches[0]);
     gradient.addColorStop(0.5 + hueShift, colorMatches[1] || colorMatches[0]);
@@ -175,7 +188,6 @@ export default function VideoCreator() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    // Text shadow
     ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
     ctx.shadowBlur = 20;
     ctx.shadowOffsetX = 0;
@@ -201,7 +213,6 @@ export default function VideoCreator() {
     const totalHeight = lines.length * lineHeight;
     const startY = height / 2 - totalHeight / 2 + lineHeight / 2;
 
-    // Draw text
     ctx.fillStyle = "#ffffff";
     lines.forEach((line, i) => {
       ctx.fillText(line, width / 2, startY + i * lineHeight);
@@ -210,6 +221,61 @@ export default function VideoCreator() {
     ctx.globalAlpha = 1;
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;
+
+    // Waveform visualizer
+    if (renderWaveform && waveform && waveform.length > 0) {
+      const barCount = 40;
+      const barWidth = (width * 0.6) / barCount;
+      const barGap = barWidth * 0.3;
+      const waveformY = height * 0.78;
+      const maxBarHeight = height * 0.08;
+      const waveformStartX = width * 0.2;
+
+      ctx.globalAlpha = 0.85;
+
+      for (let i = 0; i < barCount; i++) {
+        // Sample from the waveform data
+        const dataIndex = Math.floor((i / barCount) * waveform.length);
+        // Normalize: waveform values are typically -1 to 1 or 0-255 depending on type
+        const value = Math.abs(waveform[dataIndex] || 0);
+        const normalizedValue = Math.min(value / 128, 1); // For byte frequency data (0-255)
+        const barHeight = Math.max(2, normalizedValue * maxBarHeight);
+
+        const x = waveformStartX + i * (barWidth + barGap);
+
+        // Color: bars before progress are brighter, after are dimmer
+        const progressX = (progress || 0);
+        const barProgress = i / barCount;
+        
+        if (barProgress <= progressX) {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        } else {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+        }
+
+        // Rounded bars
+        const radius = Math.min(barWidth / 2, 3);
+        const bx = x;
+        const by = waveformY - barHeight / 2;
+        const bw = barWidth;
+        const bh = barHeight;
+        
+        ctx.beginPath();
+        ctx.moveTo(bx + radius, by);
+        ctx.lineTo(bx + bw - radius, by);
+        ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + radius);
+        ctx.lineTo(bx + bw, by + bh - radius);
+        ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - radius, by + bh);
+        ctx.lineTo(bx + radius, by + bh);
+        ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - radius);
+        ctx.lineTo(bx, by + radius);
+        ctx.quadraticCurveTo(bx, by, bx + radius, by);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 1;
+    }
   }, [script]);
 
   // Draw current frame
@@ -228,9 +294,9 @@ export default function VideoCreator() {
     ctx.scale(previewScale, previewScale);
     const virtualCanvas = { width: ratio.width, height: ratio.height } as HTMLCanvasElement;
     Object.defineProperty(ctx, 'canvas', { value: virtualCanvas, configurable: true });
-    drawFrame(ctx, script.slides[currentSlide], gradientPhase, textOpacity);
+    drawFrame(ctx, script.slides[currentSlide], gradientPhase, textOpacity, waveformData, playbackProgress, showWaveform);
     ctx.restore();
-  }, [script, currentSlide, gradientPhase, textOpacity, drawFrame, ratio]);
+  }, [script, currentSlide, gradientPhase, textOpacity, drawFrame, ratio, waveformData, playbackProgress, showWaveform]);
 
   // Animation loop for preview
   useEffect(() => {
@@ -240,10 +306,70 @@ export default function VideoCreator() {
     let slideIndex = currentSlide;
     let phase = gradientPhase;
 
+    // Set up audio analyser for waveform visualization
+    let audioCtx: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let frequencyData: Uint8Array<ArrayBuffer> | null = null;
+
+    const setupAnalyser = () => {
+      if (!showWaveform) return;
+      try {
+        audioCtx = new AudioContext();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 128;
+        frequencyData = new Uint8Array(analyser.frequencyBinCount);
+        playbackAudioCtxRef.current = audioCtx;
+        analyserRef.current = analyser;
+      } catch { /* ignore */ }
+    };
+
+    setupAnalyser();
+
+    const playSlideAudio = (index: number) => {
+      const audioBlob = audioBlobs.get(index);
+      if (!audioBlob) return;
+
+      const url = URL.createObjectURL(audioBlob);
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      // Connect to analyser if waveform is enabled
+      if (showWaveform && audioCtx && analyser) {
+        try {
+          const source = audioCtx.createMediaElementSource(audio);
+          source.connect(analyser);
+          analyser.connect(audioCtx.destination);
+        } catch { /* already connected or error */ }
+      }
+
+      audio.play().catch(() => {});
+    };
+
+    // Play first slide audio
+    playSlideAudio(slideIndex);
+
     const animate = () => {
       const elapsed = (Date.now() - slideStartTime) / 1000;
       const slideDuration = getSlideDuration(slideIndex);
       phase += 1;
+
+      // Progress within slide
+      const progress = Math.min(elapsed / slideDuration, 1);
+      setPlaybackProgress(progress);
+
+      // Read frequency data for waveform
+      if (showWaveform && analyser && frequencyData) {
+        analyser.getByteFrequencyData(frequencyData);
+        // Convert to Float32Array for drawFrame
+        const floatData = new Float32Array(frequencyData.length);
+        for (let i = 0; i < frequencyData.length; i++) {
+          floatData[i] = frequencyData[i];
+        }
+        setWaveformData(floatData);
+      }
 
       // Text fade in/out
       let opacity = 1;
@@ -260,34 +386,18 @@ export default function VideoCreator() {
         if (nextIndex >= script.slides.length) {
           setIsPlaying(false);
           setCurrentSlide(0);
+          setWaveformData(null);
+          setPlaybackProgress(0);
           return;
         }
         slideIndex = nextIndex;
         setCurrentSlide(nextIndex);
         slideStartTime = Date.now();
-
-        // Play audio for next slide
-        const audioBlob = audioBlobs.get(nextIndex);
-        if (audioBlob) {
-          const url = URL.createObjectURL(audioBlob);
-          if (audioRef.current) {
-            audioRef.current.pause();
-          }
-          audioRef.current = new Audio(url);
-          audioRef.current.play().catch(() => {});
-        }
+        playSlideAudio(nextIndex);
       }
 
       animationRef.current = requestAnimationFrame(animate);
     };
-
-    // Play first slide audio
-    const firstAudio = audioBlobs.get(slideIndex);
-    if (firstAudio) {
-      const url = URL.createObjectURL(firstAudio);
-      audioRef.current = new Audio(url);
-      audioRef.current.play().catch(() => {});
-    }
 
     animationRef.current = requestAnimationFrame(animate);
 
@@ -297,8 +407,14 @@ export default function VideoCreator() {
         audioRef.current.pause();
         audioRef.current = null;
       }
+      if (audioCtx) {
+        audioCtx.close().catch(() => {});
+        playbackAudioCtxRef.current = null;
+        analyserRef.current = null;
+      }
+      setWaveformData(null);
     };
-  }, [isPlaying, getSlideDuration]);
+  }, [isPlaying, getSlideDuration, showWaveform]);
 
   const handleGenerateScript = async () => {
     if (!prompt.trim()) {
@@ -449,7 +565,10 @@ export default function VideoCreator() {
           if (elapsed < 0.3) opacity = elapsed / 0.3;
           else if (elapsed > slideDurSec - 0.3) opacity = Math.max(0, (slideDurSec - elapsed) / 0.3);
 
-          drawFrame(offCtx, slide, phase, opacity);
+          const exportProgress = elapsed / slideDurSec;
+          // Generate fake waveform bars for export if waveform enabled
+          const exportWaveform = showWaveform ? new Float32Array(64).map(() => Math.random() * 180 + 20) : null;
+          drawFrame(offCtx, slide, phase, opacity, exportWaveform, exportProgress, showWaveform);
           await new Promise(r => setTimeout(r, 33)); // ~30fps
         }
       }
@@ -632,6 +751,18 @@ export default function VideoCreator() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Waveform toggle */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AudioWaveform className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-xs">Waveform Visualizer</Label>
+                </div>
+                <Switch
+                  checked={showWaveform}
+                  onCheckedChange={setShowWaveform}
+                />
               </div>
 
               {/* Actions */}
