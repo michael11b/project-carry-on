@@ -141,18 +141,32 @@ export default function Studio() {
         }
       : undefined;
 
-    // Build prompt with page profile context
+    // Determine content type based on page selection and channel
     const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
-    let fullPrompt = prompt.trim();
-    if (selectedPage?.system_prompt) {
-      fullPrompt = `${selectedPage.system_prompt}\n\n---\nUser request: ${fullPrompt}`;
+    let contentType: string | undefined;
+    if (selectedPage) {
+      contentType = "facebook_post"; // Page selected = Facebook post context
     }
 
+    // Build page context for the edge function
+    const pageContext = selectedPage ? {
+      page_name: selectedPage.page_name,
+      description: selectedPage.description,
+      target_audience: selectedPage.target_audience,
+      content_tone: selectedPage.content_tone,
+      content_topics: selectedPage.content_topics,
+      posting_goals: selectedPage.posting_goals,
+      hashtag_preferences: selectedPage.hashtag_preferences,
+      custom_system_prompt: selectedPage.system_prompt,
+    } : undefined;
+
     await streamGenerate({
-      prompt: fullPrompt,
+      prompt: prompt.trim(),
       brandVoice,
       channel: channel || undefined,
       variantCount: parseInt(variantCount),
+      contentType,
+      pageContext,
       onDelta: (text) => setOutput((prev) => prev + text),
       onDone: () => setIsStreaming(false),
       onError: (error) => {
