@@ -198,35 +198,36 @@ export default function VideoCreator() {
       // Animated gradient background
       const angle = 135 + Math.sin(phase * 0.02) * 30;
       const rad = (angle * Math.PI) / 180;
-    const x1 = width / 2 - Math.cos(rad) * width;
-    const y1 = height / 2 - Math.sin(rad) * height;
-    const x2 = width / 2 + Math.cos(rad) * width;
-    const y2 = height / 2 + Math.sin(rad) * height;
+      const x1 = width / 2 - Math.cos(rad) * width;
+      const y1 = height / 2 - Math.sin(rad) * height;
+      const x2 = width / 2 + Math.cos(rad) * width;
+      const y2 = height / 2 + Math.sin(rad) * height;
 
-    // Parse gradient colors from script
-    const gradientStr = script?.gradient || GRADIENT_PRESETS[0];
-    const colorMatches = gradientStr.match(/#[0-9a-fA-F]{6}/g) || ["#667eea", "#764ba2"];
-    
-    const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
-    
-    const hueShift = Math.sin(phase * 0.01) * 0.1;
-    gradient.addColorStop(0, colorMatches[0]);
-    gradient.addColorStop(0.5 + hueShift, colorMatches[1] || colorMatches[0]);
-    if (colorMatches[2]) gradient.addColorStop(1, colorMatches[2]);
-    else gradient.addColorStop(1, colorMatches[0]);
+      // Parse gradient colors from script
+      const gradientStr = script?.gradient || GRADIENT_PRESETS[0];
+      const colorMatches = gradientStr.match(/#[0-9a-fA-F]{6}/g) || ["#667eea", "#764ba2"];
+      
+      const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+      
+      const hueShift = Math.sin(phase * 0.01) * 0.1;
+      gradient.addColorStop(0, colorMatches[0]);
+      gradient.addColorStop(0.5 + hueShift, colorMatches[1] || colorMatches[0]);
+      if (colorMatches[2]) gradient.addColorStop(1, colorMatches[2]);
+      else gradient.addColorStop(1, colorMatches[0]);
 
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
 
-    // Animated particles/circles
-    for (let i = 0; i < 6; i++) {
-      const x = (width * (i + 1)) / 7 + Math.sin(phase * 0.015 + i) * 40;
-      const y = (height * (i + 1)) / 7 + Math.cos(phase * 0.02 + i * 2) * 40;
-      const r = 30 + Math.sin(phase * 0.03 + i) * 15;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 255, 255, ${0.05 + Math.sin(phase * 0.02 + i) * 0.03})`;
-      ctx.fill();
+      // Animated particles/circles
+      for (let i = 0; i < 6; i++) {
+        const x = (width * (i + 1)) / 7 + Math.sin(phase * 0.015 + i) * 40;
+        const y = (height * (i + 1)) / 7 + Math.cos(phase * 0.02 + i * 2) * 40;
+        const r = 30 + Math.sin(phase * 0.03 + i) * 15;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.05 + Math.sin(phase * 0.02 + i) * 0.03})`;
+        ctx.fill();
+      }
     }
 
     // Text rendering
