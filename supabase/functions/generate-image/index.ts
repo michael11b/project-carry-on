@@ -23,13 +23,27 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, brandStyle, platform } = await req.json();
+    const { prompt, brandStyle, platform, contentType, pageContext } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Build enhanced prompt – force image generation
-    let enhancedPrompt = `Generate an image based on the following description. You MUST produce an image, do not ask clarifying questions. Just create the best image you can:\n\n${prompt}`;
+    // Build enhanced prompt with content type context
+    let contextPrefix = "";
+    if (contentType === "facebook_post_image") {
+      contextPrefix = "This image is for a Facebook page post. It should be eye-catching, shareable, and suitable for social media. ";
+    } else if (contentType === "instagram_image") {
+      contextPrefix = "This image is for an Instagram post. It should be visually stunning, on-trend, and optimized for the Instagram feed. ";
+    }
+
+    // Add page context
+    if (pageContext) {
+      if (pageContext.page_name) contextPrefix += `The image is for the page "${pageContext.page_name}". `;
+      if (pageContext.description) contextPrefix += `Page context: ${pageContext.description}. `;
+      if (pageContext.content_tone) contextPrefix += `Visual tone should be ${pageContext.content_tone}. `;
+    }
+
+    let enhancedPrompt = `Generate an image based on the following description. You MUST produce an image, do not ask clarifying questions. Just create the best image you can:\n\n${contextPrefix}${prompt}`;
 
     if (platform && PLATFORM_PRESETS[platform]) {
       enhancedPrompt += `\n\nImage dimensions/format: ${PLATFORM_PRESETS[platform]}.`;
