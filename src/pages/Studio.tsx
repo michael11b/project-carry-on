@@ -447,7 +447,7 @@ export default function Studio() {
       </Collapsible>
 
       <Tabs defaultValue="text" className="space-y-4">
-        <TabsList className="grid w-full max-w-lg grid-cols-4">
+        <TabsList className="grid w-full max-w-2xl grid-cols-5">
           <TabsTrigger value="text" className="gap-2">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Text</span>
@@ -455,6 +455,10 @@ export default function Studio() {
           <TabsTrigger value="image" className="gap-2">
             <Image className="h-4 w-4" />
             <span className="hidden sm:inline">Image</span>
+          </TabsTrigger>
+          <TabsTrigger value="video" className="gap-2">
+            <Film className="h-4 w-4" />
+            <span className="hidden sm:inline">Video</span>
           </TabsTrigger>
           <TabsTrigger value="audio" className="gap-2">
             <Volume2 className="h-4 w-4" />
