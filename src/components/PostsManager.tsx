@@ -177,7 +177,7 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
     }
   };
 
-
+  const handleDelete = async () => {
     if (!deletePostId) return;
     setDeleting(true);
     try {
