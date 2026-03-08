@@ -915,18 +915,40 @@ export default function VideoCreator() {
 
       // Mix background music into export
       let bgMusicSource: AudioBufferSourceNode | null = null;
+      let bgMusicGain: GainNode | null = null;
+      let totalExportDuration = 0;
+      for (let i = 0; i < script.slides.length; i++) totalExportDuration += getSlideDuration(i);
+
       if (bgMusicBlob) {
         try {
           const musicAb = await bgMusicBlob.arrayBuffer();
           const musicBuf = await audioContext.decodeAudioData(musicAb);
-          const gainNode = audioContext.createGain();
-          gainNode.gain.value = bgMusicVolume;
+          bgMusicGain = audioContext.createGain();
+          bgMusicGain.gain.setValueAtTime(bgMusicFadeIn > 0 ? 0 : bgMusicVolume, audioContext.currentTime);
+
+          // Fade-in
+          if (bgMusicFadeIn > 0) {
+            bgMusicGain.gain.linearRampToValueAtTime(bgMusicVolume, audioContext.currentTime + bgMusicFadeIn);
+          }
+          // Fade-out
+          if (bgMusicFadeOut > 0) {
+            const fadeOutStart = Math.max(0, totalExportDuration - bgMusicFadeOut);
+            bgMusicGain.gain.setValueAtTime(bgMusicVolume, audioContext.currentTime + fadeOutStart);
+            bgMusicGain.gain.linearRampToValueAtTime(0, audioContext.currentTime + totalExportDuration);
+          }
+
           bgMusicSource = audioContext.createBufferSource();
           bgMusicSource.buffer = musicBuf;
-          bgMusicSource.loop = true;
-          bgMusicSource.connect(gainNode);
-          gainNode.connect(destination);
-          bgMusicSource.start();
+          bgMusicSource.loop = bgMusicLoop;
+          // Set trim: loopStart/loopEnd control which region loops
+          const trimStart = bgMusicTrimStart;
+          const trimEnd = bgMusicTrimEnd > bgMusicTrimStart ? bgMusicTrimEnd : musicBuf.duration;
+          bgMusicSource.loopStart = trimStart;
+          bgMusicSource.loopEnd = trimEnd;
+          bgMusicSource.connect(bgMusicGain);
+          bgMusicGain.connect(destination);
+          // Start from trim start position
+          bgMusicSource.start(0, trimStart);
         } catch { /* ignore music decode errors */ }
       }
 
