@@ -393,9 +393,15 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
               </Select>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={() => setEditPost(null)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}>
+            {editPost?.published_fb_id && editPost?.channel === "facebook" && (
+              <Button variant="secondary" onClick={handleSyncToFacebook} disabled={syncing || saving}>
+                {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                Update on Facebook
+              </Button>
+            )}
+            <Button onClick={handleSave} disabled={saving || syncing}>
               {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Save Changes
             </Button>
