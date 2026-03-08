@@ -485,6 +485,76 @@ export default function VideoCreator() {
     }
   }, []);
 
+  /**
+   * Composite a transition between two rendered frames.
+   * `t` is 0..1 progress through the transition.
+   */
+  const compositeTransition = useCallback((
+    ctx: CanvasRenderingContext2D,
+    outCanvas: HTMLCanvasElement,
+    inCanvas: HTMLCanvasElement,
+    t: number,
+    type: TransitionType,
+  ) => {
+    const { width, height } = ctx.canvas;
+    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+    if (type === "crossfade" || type === "none") {
+      ctx.globalAlpha = 1;
+      ctx.drawImage(outCanvas, 0, 0, width, height);
+      ctx.globalAlpha = ease;
+      ctx.drawImage(inCanvas, 0, 0, width, height);
+      ctx.globalAlpha = 1;
+    } else if (type === "slide") {
+      const offset = ease * width;
+      ctx.drawImage(outCanvas, -offset, 0, width, height);
+      ctx.drawImage(inCanvas, width - offset, 0, width, height);
+    } else if (type === "zoom") {
+      ctx.drawImage(inCanvas, 0, 0, width, height);
+      const scale = 1 + ease * 0.3;
+      const dx = (width * (1 - scale)) / 2;
+      const dy = (height * (1 - scale)) / 2;
+      ctx.globalAlpha = 1 - ease;
+      ctx.drawImage(outCanvas, dx, dy, width * scale, height * scale);
+      ctx.globalAlpha = 1;
+    } else if (type === "wipe") {
+      const wipeX = Math.floor(ease * width);
+      ctx.drawImage(outCanvas, 0, 0, width, height);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, wipeX, height);
+      ctx.clip();
+      ctx.drawImage(inCanvas, 0, 0, width, height);
+      ctx.restore();
+    }
+  }, []);
+
+  /** Helper: render a single slide to an offscreen canvas */
+  const renderSlideToCanvas = useCallback((
+    canvas: HTMLCanvasElement,
+    slide: Slide,
+    slideIndex: number,
+    phase: number,
+    opacity: number,
+    progress: number,
+    scriptGradient: string,
+    wf: Float32Array | null,
+    wfProgress: number,
+    doWaveform: boolean,
+    wfStyle: "bars" | "circular" | "line",
+    ts: TextStyle,
+  ) => {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const bg = getSlideBg(slide, scriptGradient);
+    drawFrame(
+      ctx, slide, phase, opacity, wf, wfProgress, doWaveform, wfStyle,
+      bg.type === "image" ? slideBgImagesRef.current.get(slideIndex) || null : null,
+      bg.type === "video" ? slideBgVideosRef.current.get(slideIndex) || null : null,
+      ts, bg.gradient,
+    );
+  }, [drawFrame, getSlideBg]);
+
   // ─── Draw current frame effect ─────────────────────────────────────────
 
   useEffect(() => {
