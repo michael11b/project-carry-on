@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import PublishPanel from "@/components/PublishPanel";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
