@@ -96,12 +96,22 @@ serve(async (req) => {
     const postType = post.post_type || "text";
     let fbResult: any;
 
+    // Use title as caption (content may contain AI preamble text)
+    const caption = post.title || post.content || "";
+
+    // Validate media_url is a proper HTTP URL (not base64)
+    if (postType !== "text" && post.media_url) {
+      if (!post.media_url.startsWith("http")) {
+        throw new Error("media_url must be an HTTP(S) URL, not a data URL");
+      }
+    }
+
     if (postType === "text") {
       const res = await fetch(`https://graph.facebook.com/v22.0/${pageId}/feed`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: post.content || post.title,
+          message: caption,
           access_token: pageToken,
         }),
       });
@@ -113,7 +123,8 @@ serve(async (req) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: post.media_url,
-          caption: post.content || post.title,
+          caption: caption,
+          published: true,
           access_token: pageToken,
         }),
       });
@@ -128,7 +139,8 @@ serve(async (req) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           file_url: post.media_url,
-          description: post.content || post.title,
+          description: caption,
+          published: true,
           access_token: pageToken,
         }),
       });
