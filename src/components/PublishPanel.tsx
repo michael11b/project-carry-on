@@ -54,6 +54,7 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
   const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
   const [scheduleTime, setScheduleTime] = useState("09:00");
   const [title, setTitle] = useState("");
+  const [caption, setCaption] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
