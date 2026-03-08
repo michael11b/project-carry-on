@@ -153,12 +153,51 @@ export default function VideoCreator() {
     progress?: number,
     renderWaveform?: boolean,
     waveStyle?: "bars" | "circular" | "line",
+    bgImage?: HTMLImageElement | null,
+    bgVideo?: HTMLVideoElement | null,
   ) => {
     const { width, height } = ctx.canvas;
 
-    // Animated gradient background
-    const angle = 135 + Math.sin(phase * 0.02) * 30;
-    const rad = (angle * Math.PI) / 180;
+    // Background rendering
+    let drewCustomBg = false;
+    if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
+      // Cover-fit the image
+      const imgRatio = bgImage.naturalWidth / bgImage.naturalHeight;
+      const canvasRatio = width / height;
+      let sx = 0, sy = 0, sw = bgImage.naturalWidth, sh = bgImage.naturalHeight;
+      if (imgRatio > canvasRatio) {
+        sw = bgImage.naturalHeight * canvasRatio;
+        sx = (bgImage.naturalWidth - sw) / 2;
+      } else {
+        sh = bgImage.naturalWidth / canvasRatio;
+        sy = (bgImage.naturalHeight - sh) / 2;
+      }
+      ctx.drawImage(bgImage, sx, sy, sw, sh, 0, 0, width, height);
+      // Slight dark overlay for text readability
+      ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+      ctx.fillRect(0, 0, width, height);
+      drewCustomBg = true;
+    } else if (bgVideo && bgVideo.readyState >= 2) {
+      const vidRatio = bgVideo.videoWidth / bgVideo.videoHeight;
+      const canvasRatio = width / height;
+      let sx = 0, sy = 0, sw = bgVideo.videoWidth, sh = bgVideo.videoHeight;
+      if (vidRatio > canvasRatio) {
+        sw = bgVideo.videoHeight * canvasRatio;
+        sx = (bgVideo.videoWidth - sw) / 2;
+      } else {
+        sh = bgVideo.videoWidth / canvasRatio;
+        sy = (bgVideo.videoHeight - sh) / 2;
+      }
+      ctx.drawImage(bgVideo, sx, sy, sw, sh, 0, 0, width, height);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+      ctx.fillRect(0, 0, width, height);
+      drewCustomBg = true;
+    }
+
+    if (!drewCustomBg) {
+      // Animated gradient background
+      const angle = 135 + Math.sin(phase * 0.02) * 30;
+      const rad = (angle * Math.PI) / 180;
     const x1 = width / 2 - Math.cos(rad) * width;
     const y1 = height / 2 - Math.sin(rad) * height;
     const x2 = width / 2 + Math.cos(rad) * width;
