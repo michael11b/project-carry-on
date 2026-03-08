@@ -1450,6 +1450,40 @@ export default function VideoCreator() {
                 </Select>
               </div>
 
+              {/* Slide Transitions */}
+              <div className="space-y-3 border border-border rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <Film className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-xs font-medium">Slide Transitions</Label>
+                </div>
+                <div className="flex gap-1 flex-wrap">
+                  {TRANSITION_OPTIONS.map(t => (
+                    <button
+                      key={t.value}
+                      onClick={() => setTransitionType(t.value)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                        transitionType === t.value
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                {transitionType !== "none" && (
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Duration ({transitionDuration.toFixed(1)}s)</Label>
+                    <Slider
+                      value={[transitionDuration]}
+                      min={0.2} max={1.5} step={0.1}
+                      onValueChange={([v]) => setTransitionDuration(v)}
+                      className="py-1"
+                    />
+                  </div>
+                )}
+              </div>
+
               {/* Waveform toggle */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
