@@ -291,17 +291,17 @@ export default function Studio() {
         }
       : undefined;
 
-    // Build page context for images
+    // Build page context from editable overrides for images
     const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
     let contentType: string | undefined;
     if (selectedPage) {
       contentType = "facebook_post_image";
     }
 
-    const pageContext = selectedPage ? {
-      page_name: selectedPage.page_name,
-      description: selectedPage.description,
-      content_tone: selectedPage.content_tone,
+    const pageContext = (selectedPage || ctxDescription || ctxTone) ? {
+      page_name: selectedPage?.page_name || "",
+      description: ctxDescription,
+      content_tone: ctxTone,
     } : undefined;
 
     try {
