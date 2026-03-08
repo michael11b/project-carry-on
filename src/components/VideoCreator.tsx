@@ -1612,6 +1612,8 @@ export default function VideoCreator() {
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
+
+                    {/* Volume */}
                     <div className="space-y-1">
                       <Label className="text-[10px] text-muted-foreground">Volume ({Math.round(bgMusicVolume * 100)}%)</Label>
                       <Slider
@@ -1621,6 +1623,54 @@ export default function VideoCreator() {
                           setBgMusicVolume(v);
                           if (bgMusicAudioRef.current) bgMusicAudioRef.current.volume = v;
                         }}
+                        className="py-1"
+                      />
+                    </div>
+
+                    {/* Trim */}
+                    {bgMusicDuration > 0 && (
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">
+                          Trim ({bgMusicTrimStart.toFixed(1)}s – {(bgMusicTrimEnd || bgMusicDuration).toFixed(1)}s of {bgMusicDuration.toFixed(1)}s)
+                        </Label>
+                        <Slider
+                          value={[bgMusicTrimStart, bgMusicTrimEnd || bgMusicDuration]}
+                          min={0}
+                          max={bgMusicDuration}
+                          step={0.5}
+                          onValueChange={([s, e]) => {
+                            setBgMusicTrimStart(s);
+                            setBgMusicTrimEnd(e);
+                          }}
+                          className="py-1"
+                        />
+                      </div>
+                    )}
+
+                    {/* Loop toggle */}
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] text-muted-foreground">Loop music</Label>
+                      <Switch checked={bgMusicLoop} onCheckedChange={setBgMusicLoop} />
+                    </div>
+
+                    {/* Fade In */}
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Fade In ({bgMusicFadeIn.toFixed(1)}s)</Label>
+                      <Slider
+                        value={[bgMusicFadeIn]}
+                        min={0} max={5} step={0.5}
+                        onValueChange={([v]) => setBgMusicFadeIn(v)}
+                        className="py-1"
+                      />
+                    </div>
+
+                    {/* Fade Out */}
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Fade Out ({bgMusicFadeOut.toFixed(1)}s)</Label>
+                      <Slider
+                        value={[bgMusicFadeOut]}
+                        min={0} max={5} step={0.5}
+                        onValueChange={([v]) => setBgMusicFadeOut(v)}
                         className="py-1"
                       />
                     </div>
