@@ -544,6 +544,16 @@ export default function VideoCreator() {
 
     playSlideAudio(slideIndex);
 
+    // Start background music
+    let bgMusicEl: HTMLAudioElement | null = null;
+    if (bgMusicUrl) {
+      bgMusicEl = new Audio(bgMusicUrl);
+      bgMusicEl.loop = true;
+      bgMusicEl.volume = bgMusicVolume;
+      bgMusicAudioRef.current = bgMusicEl;
+      bgMusicEl.play().catch(() => {});
+    }
+
     const animate = () => {
       const elapsed = (Date.now() - slideStartTime) / 1000;
       const slideDuration = getSlideDuration(slideIndex);
