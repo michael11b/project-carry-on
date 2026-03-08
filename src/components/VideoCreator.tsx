@@ -260,7 +260,7 @@ export default function VideoCreator() {
           ctx.closePath();
           ctx.fill();
         }
-      } else if (effectifectiveStyle === "circular") {
+      } else if (effectiveStyle === "circular") {
         const cx = width / 2;
         const cy = height * 0.78;
         const baseRadius = Math.min(width, height) * 0.06;
