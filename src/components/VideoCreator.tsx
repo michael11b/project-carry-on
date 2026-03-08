@@ -1816,6 +1816,18 @@ export default function VideoCreator() {
           )}
         </CardContent>
       </Card>
+
+      {/* Publish Panel */}
+      {exportedVideoUrl && (
+        <div className="lg:col-span-2">
+          <PublishPanel
+            content={script?.title || prompt || "Video post"}
+            mediaUrl={exportedVideoUrl}
+            defaultTitle={script?.title || prompt?.slice(0, 80)}
+            hasContent={!!exportedVideoUrl}
+          />
+        </div>
+      )}
     </div>
   );
 }
