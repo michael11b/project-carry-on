@@ -71,6 +71,7 @@ export default function VideoCreator() {
 
   // Audio state
   const [audioBlobs, setAudioBlobs] = useState<Map<number, Blob>>(new Map());
+  const [audioDurations, setAudioDurations] = useState<Map<number, number>>(new Map());
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [audioProgress, setAudioProgress] = useState(0);
 
