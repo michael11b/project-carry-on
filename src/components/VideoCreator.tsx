@@ -82,6 +82,11 @@ export default function VideoCreator() {
   const [isRecording, setIsRecording] = useState(false);
   const [textOpacity, setTextOpacity] = useState(1);
   const [gradientPhase, setGradientPhase] = useState(0);
+  const [showWaveform, setShowWaveform] = useState(false);
+  const [waveformData, setWaveformData] = useState<Float32Array | null>(null);
+  const [playbackProgress, setPlaybackProgress] = useState(0); // 0-1 progress within current slide
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const playbackAudioCtxRef = useRef<AudioContext | null>(null);
 
   // Recording state
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
