@@ -99,13 +99,13 @@ export default function WordHighlightCreator() {
 
   const ratio = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[0];
 
-  // Compute cumulative timing from segments
-  const segmentTimings = segments.map((seg, i) => {
+  // Compute cumulative timing from segments (memoized to prevent effect restarts)
+  const segmentTimings = useMemo(() => segments.map((seg, i) => {
     const startTime = segments.slice(0, i).reduce((sum, s) => sum + s.duration, 0);
     return { ...seg, startTime, words: seg.text.trim().split(/\s+/).filter(Boolean) };
-  });
-  const totalScriptDuration = segments.reduce((sum, s) => sum + s.duration, 0);
-  const fullVoiceover = segments.map(s => s.voiceover).join(". ");
+  }), [segments]);
+  const totalScriptDuration = useMemo(() => segments.reduce((sum, s) => sum + s.duration, 0), [segments]);
+  const fullVoiceover = useMemo(() => segments.map(s => s.voiceover).join(". "), [segments]);
 
   // ─── Script Generation ──────────────────────────────────────────────────
 
