@@ -213,18 +213,19 @@ export default function VideoCreator() {
 
     const animate = () => {
       const elapsed = (Date.now() - slideStartTime) / 1000;
-      const slideDuration = script.slides[slideIndex].duration;
+      const slideDuration = getSlideDuration(slideIndex);
       phase += 1;
 
       // Text fade in/out
       let opacity = 1;
-      if (elapsed < 0.3) opacity = elapsed / 0.3;
-      else if (elapsed > slideDuration - 0.3) opacity = Math.max(0, (slideDuration - elapsed) / 0.3);
+      const fadeTime = 0.3;
+      if (elapsed < fadeTime) opacity = elapsed / fadeTime;
+      else if (elapsed > slideDuration - fadeTime) opacity = Math.max(0, (slideDuration - elapsed) / fadeTime);
 
       setGradientPhase(phase);
       setTextOpacity(opacity);
 
-      // Move to next slide
+      // Move to next slide when duration is reached
       if (elapsed >= slideDuration) {
         const nextIndex = slideIndex + 1;
         if (nextIndex >= script.slides.length) {
@@ -236,7 +237,7 @@ export default function VideoCreator() {
         setCurrentSlide(nextIndex);
         slideStartTime = Date.now();
 
-        // Play audio for this slide
+        // Play audio for next slide
         const audioBlob = audioBlobs.get(nextIndex);
         if (audioBlob) {
           const url = URL.createObjectURL(audioBlob);
@@ -268,7 +269,7 @@ export default function VideoCreator() {
         audioRef.current = null;
       }
     };
-  }, [isPlaying]);
+  }, [isPlaying, getSlideDuration]);
 
   const handleGenerateScript = async () => {
     if (!prompt.trim()) {
