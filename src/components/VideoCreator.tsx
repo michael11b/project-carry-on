@@ -11,6 +11,7 @@ import {
 import {
   Sparkles, Loader2, Play, Pause, Download, Film,
   ChevronLeft, ChevronRight, RotateCcw, Volume2, AudioWaveform,
+  ImagePlus, VideoIcon, X,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
@@ -89,6 +90,13 @@ export default function VideoCreator() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const playbackAudioCtxRef = useRef<AudioContext | null>(null);
 
+  // Background media state
+  const [bgType, setBgType] = useState<"gradient" | "image" | "video">("gradient");
+  const [bgMediaUrl, setBgMediaUrl] = useState<string | null>(null);
+  const bgImageRef = useRef<HTMLImageElement | null>(null);
+  const bgVideoRef = useRef<HTMLVideoElement | null>(null);
+  const bgFileInputRef = useRef<HTMLInputElement>(null);
+
   // Recording state
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
@@ -145,41 +153,81 @@ export default function VideoCreator() {
     progress?: number,
     renderWaveform?: boolean,
     waveStyle?: "bars" | "circular" | "line",
+    bgImage?: HTMLImageElement | null,
+    bgVideo?: HTMLVideoElement | null,
   ) => {
     const { width, height } = ctx.canvas;
 
-    // Animated gradient background
-    const angle = 135 + Math.sin(phase * 0.02) * 30;
-    const rad = (angle * Math.PI) / 180;
-    const x1 = width / 2 - Math.cos(rad) * width;
-    const y1 = height / 2 - Math.sin(rad) * height;
-    const x2 = width / 2 + Math.cos(rad) * width;
-    const y2 = height / 2 + Math.sin(rad) * height;
+    // Background rendering
+    let drewCustomBg = false;
+    if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
+      // Cover-fit the image
+      const imgRatio = bgImage.naturalWidth / bgImage.naturalHeight;
+      const canvasRatio = width / height;
+      let sx = 0, sy = 0, sw = bgImage.naturalWidth, sh = bgImage.naturalHeight;
+      if (imgRatio > canvasRatio) {
+        sw = bgImage.naturalHeight * canvasRatio;
+        sx = (bgImage.naturalWidth - sw) / 2;
+      } else {
+        sh = bgImage.naturalWidth / canvasRatio;
+        sy = (bgImage.naturalHeight - sh) / 2;
+      }
+      ctx.drawImage(bgImage, sx, sy, sw, sh, 0, 0, width, height);
+      // Slight dark overlay for text readability
+      ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+      ctx.fillRect(0, 0, width, height);
+      drewCustomBg = true;
+    } else if (bgVideo && bgVideo.readyState >= 2) {
+      const vidRatio = bgVideo.videoWidth / bgVideo.videoHeight;
+      const canvasRatio = width / height;
+      let sx = 0, sy = 0, sw = bgVideo.videoWidth, sh = bgVideo.videoHeight;
+      if (vidRatio > canvasRatio) {
+        sw = bgVideo.videoHeight * canvasRatio;
+        sx = (bgVideo.videoWidth - sw) / 2;
+      } else {
+        sh = bgVideo.videoWidth / canvasRatio;
+        sy = (bgVideo.videoHeight - sh) / 2;
+      }
+      ctx.drawImage(bgVideo, sx, sy, sw, sh, 0, 0, width, height);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+      ctx.fillRect(0, 0, width, height);
+      drewCustomBg = true;
+    }
 
-    // Parse gradient colors from script
-    const gradientStr = script?.gradient || GRADIENT_PRESETS[0];
-    const colorMatches = gradientStr.match(/#[0-9a-fA-F]{6}/g) || ["#667eea", "#764ba2"];
-    
-    const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
-    
-    const hueShift = Math.sin(phase * 0.01) * 0.1;
-    gradient.addColorStop(0, colorMatches[0]);
-    gradient.addColorStop(0.5 + hueShift, colorMatches[1] || colorMatches[0]);
-    if (colorMatches[2]) gradient.addColorStop(1, colorMatches[2]);
-    else gradient.addColorStop(1, colorMatches[0]);
+    if (!drewCustomBg) {
+      // Animated gradient background
+      const angle = 135 + Math.sin(phase * 0.02) * 30;
+      const rad = (angle * Math.PI) / 180;
+      const x1 = width / 2 - Math.cos(rad) * width;
+      const y1 = height / 2 - Math.sin(rad) * height;
+      const x2 = width / 2 + Math.cos(rad) * width;
+      const y2 = height / 2 + Math.sin(rad) * height;
 
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
+      // Parse gradient colors from script
+      const gradientStr = script?.gradient || GRADIENT_PRESETS[0];
+      const colorMatches = gradientStr.match(/#[0-9a-fA-F]{6}/g) || ["#667eea", "#764ba2"];
+      
+      const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+      
+      const hueShift = Math.sin(phase * 0.01) * 0.1;
+      gradient.addColorStop(0, colorMatches[0]);
+      gradient.addColorStop(0.5 + hueShift, colorMatches[1] || colorMatches[0]);
+      if (colorMatches[2]) gradient.addColorStop(1, colorMatches[2]);
+      else gradient.addColorStop(1, colorMatches[0]);
 
-    // Animated particles/circles
-    for (let i = 0; i < 6; i++) {
-      const x = (width * (i + 1)) / 7 + Math.sin(phase * 0.015 + i) * 40;
-      const y = (height * (i + 1)) / 7 + Math.cos(phase * 0.02 + i * 2) * 40;
-      const r = 30 + Math.sin(phase * 0.03 + i) * 15;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 255, 255, ${0.05 + Math.sin(phase * 0.02 + i) * 0.03})`;
-      ctx.fill();
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+
+      // Animated particles/circles
+      for (let i = 0; i < 6; i++) {
+        const x = (width * (i + 1)) / 7 + Math.sin(phase * 0.015 + i) * 40;
+        const y = (height * (i + 1)) / 7 + Math.cos(phase * 0.02 + i * 2) * 40;
+        const r = 30 + Math.sin(phase * 0.03 + i) * 15;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.05 + Math.sin(phase * 0.02 + i) * 0.03})`;
+        ctx.fill();
+      }
     }
 
     // Text rendering
@@ -360,9 +408,9 @@ export default function VideoCreator() {
     ctx.scale(previewScale, previewScale);
     const virtualCanvas = { width: ratio.width, height: ratio.height } as HTMLCanvasElement;
     Object.defineProperty(ctx, 'canvas', { value: virtualCanvas, configurable: true });
-    drawFrame(ctx, script.slides[currentSlide], gradientPhase, textOpacity, waveformData, playbackProgress, showWaveform, waveformStyle);
+    drawFrame(ctx, script.slides[currentSlide], gradientPhase, textOpacity, waveformData, playbackProgress, showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.current);
     ctx.restore();
-  }, [script, currentSlide, gradientPhase, textOpacity, drawFrame, ratio, waveformData, playbackProgress, showWaveform]);
+  }, [script, currentSlide, gradientPhase, textOpacity, drawFrame, ratio, waveformData, playbackProgress, showWaveform, bgType, bgMediaUrl]);
 
   // Animation loop for preview
   useEffect(() => {
@@ -564,6 +612,11 @@ export default function VideoCreator() {
     toast({ title: "Recording video…", description: "Please wait while the video is being recorded." });
 
     try {
+      // Reset background video to start for export
+      if (bgVideoRef.current) {
+        bgVideoRef.current.currentTime = 0;
+        bgVideoRef.current.play().catch(() => {});
+      }
       // Create a full-resolution offscreen canvas
       const offscreen = document.createElement("canvas");
       offscreen.width = ratio.width;
@@ -634,7 +687,7 @@ export default function VideoCreator() {
           const exportProgress = elapsed / slideDurSec;
           // Generate fake waveform bars for export if waveform enabled
           const exportWaveform = showWaveform ? new Float32Array(64).map(() => Math.random() * 180 + 20) : null;
-          drawFrame(offCtx, slide, phase, opacity, exportWaveform, exportProgress, showWaveform, waveformStyle);
+          drawFrame(offCtx, slide, phase, opacity, exportWaveform, exportProgress, showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.current);
           await new Promise(r => setTimeout(r, 33)); // ~30fps
         }
       }
@@ -666,7 +719,51 @@ export default function VideoCreator() {
 
   const handleGradientChange = (gradient: string) => {
     if (!script) return;
+    setBgType("gradient");
+    setBgMediaUrl(null);
+    bgImageRef.current = null;
+    bgVideoRef.current = null;
     setScript({ ...script, gradient });
+  };
+
+  const handleBgFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Revoke old URL
+    if (bgMediaUrl) URL.revokeObjectURL(bgMediaUrl);
+
+    const url = URL.createObjectURL(file);
+    setBgMediaUrl(url);
+
+    if (file.type.startsWith("image/")) {
+      setBgType("image");
+      bgVideoRef.current = null;
+      const img = new Image();
+      img.onload = () => { bgImageRef.current = img; };
+      img.src = url;
+    } else if (file.type.startsWith("video/")) {
+      setBgType("video");
+      bgImageRef.current = null;
+      const video = document.createElement("video");
+      video.src = url;
+      video.loop = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.play().catch(() => {});
+      bgVideoRef.current = video;
+    }
+  };
+
+  const handleClearBgMedia = () => {
+    if (bgMediaUrl) URL.revokeObjectURL(bgMediaUrl);
+    setBgType("gradient");
+    setBgMediaUrl(null);
+    bgImageRef.current = null;
+    if (bgVideoRef.current) {
+      bgVideoRef.current.pause();
+      bgVideoRef.current = null;
+    }
   };
 
   // Preview canvas dimensions
@@ -756,21 +853,80 @@ export default function VideoCreator() {
                 </Button>
               </div>
 
-              {/* Gradient selector */}
+              {/* Background selector */}
               <div className="space-y-2">
                 <Label className="text-xs">Background</Label>
-                <div className="flex gap-2 flex-wrap">
-                  {GRADIENT_PRESETS.map((g, i) => (
-                    <button
-                      key={i}
-                      className={`w-8 h-8 rounded-md border-2 transition-all ${
-                        script.gradient === g ? "border-primary scale-110" : "border-transparent"
-                      }`}
-                      style={{ background: g }}
-                      onClick={() => handleGradientChange(g)}
-                    />
-                  ))}
+
+                {/* Upload controls */}
+                <div className="flex gap-2 items-center mb-2">
+                  <input
+                    ref={bgFileInputRef}
+                    type="file"
+                    accept="image/*,video/mp4,video/webm"
+                    className="hidden"
+                    onChange={handleBgFileUpload}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs h-7"
+                    onClick={() => bgFileInputRef.current?.click()}
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" /> Image
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs h-7"
+                    onClick={() => {
+                      if (bgFileInputRef.current) {
+                        bgFileInputRef.current.accept = "video/mp4,video/webm,video/quicktime";
+                        bgFileInputRef.current.click();
+                        // Reset accept after
+                        setTimeout(() => {
+                          if (bgFileInputRef.current) bgFileInputRef.current.accept = "image/*,video/mp4,video/webm";
+                        }, 100);
+                      }
+                    }}
+                  >
+                    <VideoIcon className="h-3.5 w-3.5" /> Video
+                  </Button>
+                  {bgMediaUrl && (
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleClearBgMedia}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
+
+                {/* Media preview thumbnail */}
+                {bgMediaUrl && bgType === "image" && (
+                  <div className="relative w-16 h-16 rounded-md overflow-hidden border border-primary">
+                    <img src={bgMediaUrl} alt="Background" className="w-full h-full object-cover" />
+                    <Badge className="absolute bottom-0 left-0 text-[8px] rounded-none">IMG</Badge>
+                  </div>
+                )}
+                {bgMediaUrl && bgType === "video" && (
+                  <div className="relative w-16 h-16 rounded-md overflow-hidden border border-primary bg-muted flex items-center justify-center">
+                    <VideoIcon className="h-5 w-5 text-muted-foreground" />
+                    <Badge className="absolute bottom-0 left-0 text-[8px] rounded-none">VID</Badge>
+                  </div>
+                )}
+
+                {/* Gradient presets (always available as fallback) */}
+                {bgType === "gradient" && (
+                  <div className="flex gap-2 flex-wrap">
+                    {GRADIENT_PRESETS.map((g, i) => (
+                      <button
+                        key={i}
+                        className={`w-8 h-8 rounded-md border-2 transition-all ${
+                          script.gradient === g && bgType === "gradient" ? "border-primary scale-110" : "border-transparent"
+                        }`}
+                        style={{ background: g }}
+                        onClick={() => handleGradientChange(g)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Slide editor */}
