@@ -147,7 +147,37 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
     }
   };
 
-  const handleDelete = async () => {
+  const handleSyncToFacebook = async () => {
+    if (!editPost?.published_fb_id) return;
+    setSyncing(true);
+    try {
+      // Save first
+      await supabase
+        .from("scheduled_posts")
+        .update({
+          title: editTitle.trim(),
+          content: editContent.trim(),
+          status: editStatus as any,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editPost.id);
+
+      const { data, error } = await supabase.functions.invoke("facebook-update", {
+        body: { post_id: editPost.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Updated on Facebook" });
+      setEditPost(null);
+      fetchPosts();
+    } catch (e) {
+      toast({ title: "Facebook update failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+
     if (!deletePostId) return;
     setDeleting(true);
     try {
