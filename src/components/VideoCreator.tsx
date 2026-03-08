@@ -1303,6 +1303,76 @@ export default function VideoCreator() {
                 )}
               </div>
 
+              {/* Background Music */}
+              <div className="space-y-3 border border-border rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <Music className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-xs font-medium">Background Music</Label>
+                </div>
+
+                {bgMusicUrl ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between bg-muted/50 rounded-md px-2 py-1.5">
+                      <span className="text-xs truncate max-w-[180px]">{bgMusicName}</span>
+                      <button
+                        onClick={handleRemoveMusic}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Volume ({Math.round(bgMusicVolume * 100)}%)</Label>
+                      <Slider
+                        value={[bgMusicVolume]}
+                        min={0} max={1} step={0.05}
+                        onValueChange={([v]) => {
+                          setBgMusicVolume(v);
+                          if (bgMusicAudioRef.current) bgMusicAudioRef.current.volume = v;
+                        }}
+                        className="py-1"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-1 flex-wrap">
+                      {MUSIC_PRESETS.map((p) => (
+                        <button
+                          key={p.value}
+                          onClick={() => handleGenerateMusic(p)}
+                          disabled={isGeneratingMusic}
+                          className="px-2 py-0.5 rounded text-[10px] font-medium transition-colors bg-muted text-muted-foreground hover:bg-accent disabled:opacity-50"
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                    {isGeneratingMusic && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Generating music…
+                      </div>
+                    )}
+                    <input
+                      ref={bgMusicFileInputRef}
+                      type="file"
+                      accept="audio/*"
+                      className="hidden"
+                      onChange={handleMusicUpload}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 text-xs h-7"
+                      onClick={() => bgMusicFileInputRef.current?.click()}
+                    >
+                      <Upload className="h-3 w-3" /> Upload Custom Track
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               {/* Actions */}
               <div className="flex flex-col gap-2">
                 <Button
