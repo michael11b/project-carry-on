@@ -95,6 +95,7 @@ export default function WordHighlightCreator() {
   // Playback
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [exportedVideoUrl, setExportedVideoUrl] = useState<string | null>(null);
   const [playbackTime, setPlaybackTime] = useState(0);
   const [gradientPhase, setGradientPhase] = useState(0);
   const playStartRef = useRef(0);
