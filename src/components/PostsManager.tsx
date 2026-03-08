@@ -22,7 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Loader2, Pencil, Trash2, Eye, Image, FileText, Video, ExternalLink, Search, Filter, RefreshCw,
+  Loader2, Pencil, Trash2, Eye, Image, FileText, Video, ExternalLink, Search, Filter, RefreshCw, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -66,6 +66,9 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
 
   // Edit dialog
   const [editPost, setEditPost] = useState<Post | null>(null);
@@ -88,27 +91,34 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
     try {
       let query = supabase
         .from("scheduled_posts")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("org_id", orgId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (statusFilter !== "all") {
         query = query.eq("status", statusFilter as any);
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
       setPosts((data as unknown as Post[]) || []);
+      setTotalCount(count ?? 0);
     } catch (e) {
       toast({ title: "Failed to load posts", description: (e as Error).message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [orgId, statusFilter, toast]);
+  }, [orgId, statusFilter, page, toast]);
 
   useEffect(() => {
     if (orgId) fetchPosts();
   }, [fetchPosts, orgId]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(0);
+  }, [statusFilter, searchQuery]);
 
   const filteredPosts = posts.filter((p) => {
     if (!searchQuery) return true;
@@ -331,9 +341,34 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
         </CardContent>
       </Card>
 
-      <p className="text-xs text-muted-foreground">
-        Showing {filteredPosts.length} of {posts.length} posts
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Showing {filteredPosts.length} of {totalCount} posts
+        </p>
+        {totalCount > PAGE_SIZE && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0 || loading}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page + 1} of {Math.ceil(totalCount / PAGE_SIZE)}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={(page + 1) * PAGE_SIZE >= totalCount || loading}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* View Dialog */}
       <Dialog open={!!viewPost} onOpenChange={() => setViewPost(null)}>
