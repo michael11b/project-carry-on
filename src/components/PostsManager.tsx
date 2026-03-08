@@ -368,8 +368,15 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
             </div>
             {viewPost?.published_fb_id && (
               <div>
-                <Label className="text-xs text-muted-foreground">Published ID</Label>
-                <p className="text-sm font-mono">{viewPost.published_fb_id}</p>
+                <Label className="text-xs text-muted-foreground">Published on Facebook</Label>
+                <a
+                  href={`https://facebook.com/${viewPost.published_fb_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary hover:underline inline-flex items-center gap-1 mt-1"
+                >
+                  View on Facebook <ExternalLink className="h-3 w-3" />
+                </a>
               </div>
             )}
             {viewPost?.publish_error && (
