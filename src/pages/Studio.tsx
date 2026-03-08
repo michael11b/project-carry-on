@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save, Facebook, ChevronDown, Settings2 } from "lucide-react";
+import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save, Facebook, ChevronDown, Settings2, Film } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { streamGenerate } from "@/lib/streamChat";
 import TranslateTab from "@/components/TranslateTab";
 import PublishPanel from "@/components/PublishPanel";
+import VideoCreator from "@/components/VideoCreator";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Brand = Tables<"brands">;
@@ -446,7 +447,7 @@ export default function Studio() {
       </Collapsible>
 
       <Tabs defaultValue="text" className="space-y-4">
-        <TabsList className="grid w-full max-w-lg grid-cols-4">
+        <TabsList className="grid w-full max-w-2xl grid-cols-5">
           <TabsTrigger value="text" className="gap-2">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Text</span>
@@ -454,6 +455,10 @@ export default function Studio() {
           <TabsTrigger value="image" className="gap-2">
             <Image className="h-4 w-4" />
             <span className="hidden sm:inline">Image</span>
+          </TabsTrigger>
+          <TabsTrigger value="video" className="gap-2">
+            <Film className="h-4 w-4" />
+            <span className="hidden sm:inline">Video</span>
           </TabsTrigger>
           <TabsTrigger value="audio" className="gap-2">
             <Volume2 className="h-4 w-4" />
@@ -728,6 +733,10 @@ export default function Studio() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="video">
+          <VideoCreator />
         </TabsContent>
 
         <TabsContent value="audio">
