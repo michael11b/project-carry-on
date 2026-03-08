@@ -98,6 +98,15 @@ const TEXT_ANIMATIONS = [
   { value: "slide-up", label: "Slide Up" },
 ];
 
+const MUSIC_PRESETS = [
+  { value: "upbeat-pop", label: "Upbeat Pop", prompt: "Upbeat pop background music, energetic, catchy, modern, suitable for social media reels" },
+  { value: "chill-lofi", label: "Chill Lo-Fi", prompt: "Chill lo-fi hip hop background music, relaxing, calm beats, study vibes" },
+  { value: "cinematic", label: "Cinematic", prompt: "Cinematic epic background music, orchestral, inspiring, dramatic build-up" },
+  { value: "corporate", label: "Corporate", prompt: "Corporate background music, professional, motivational, light and clean" },
+  { value: "electronic", label: "Electronic", prompt: "Electronic dance background music, pulsing synths, energetic, modern EDM" },
+  { value: "acoustic", label: "Acoustic", prompt: "Acoustic guitar background music, warm, gentle, organic feel" },
+];
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function VideoCreator() {
