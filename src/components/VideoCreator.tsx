@@ -848,21 +848,80 @@ export default function VideoCreator() {
                 </Button>
               </div>
 
-              {/* Gradient selector */}
+              {/* Background selector */}
               <div className="space-y-2">
                 <Label className="text-xs">Background</Label>
-                <div className="flex gap-2 flex-wrap">
-                  {GRADIENT_PRESETS.map((g, i) => (
-                    <button
-                      key={i}
-                      className={`w-8 h-8 rounded-md border-2 transition-all ${
-                        script.gradient === g ? "border-primary scale-110" : "border-transparent"
-                      }`}
-                      style={{ background: g }}
-                      onClick={() => handleGradientChange(g)}
-                    />
-                  ))}
+
+                {/* Upload controls */}
+                <div className="flex gap-2 items-center mb-2">
+                  <input
+                    ref={bgFileInputRef}
+                    type="file"
+                    accept="image/*,video/mp4,video/webm"
+                    className="hidden"
+                    onChange={handleBgFileUpload}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs h-7"
+                    onClick={() => bgFileInputRef.current?.click()}
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" /> Image
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs h-7"
+                    onClick={() => {
+                      if (bgFileInputRef.current) {
+                        bgFileInputRef.current.accept = "video/mp4,video/webm,video/quicktime";
+                        bgFileInputRef.current.click();
+                        // Reset accept after
+                        setTimeout(() => {
+                          if (bgFileInputRef.current) bgFileInputRef.current.accept = "image/*,video/mp4,video/webm";
+                        }, 100);
+                      }
+                    }}
+                  >
+                    <VideoIcon className="h-3.5 w-3.5" /> Video
+                  </Button>
+                  {bgMediaUrl && (
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleClearBgMedia}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
+
+                {/* Media preview thumbnail */}
+                {bgMediaUrl && bgType === "image" && (
+                  <div className="relative w-16 h-16 rounded-md overflow-hidden border border-primary">
+                    <img src={bgMediaUrl} alt="Background" className="w-full h-full object-cover" />
+                    <Badge className="absolute bottom-0 left-0 text-[8px] rounded-none">IMG</Badge>
+                  </div>
+                )}
+                {bgMediaUrl && bgType === "video" && (
+                  <div className="relative w-16 h-16 rounded-md overflow-hidden border border-primary bg-muted flex items-center justify-center">
+                    <VideoIcon className="h-5 w-5 text-muted-foreground" />
+                    <Badge className="absolute bottom-0 left-0 text-[8px] rounded-none">VID</Badge>
+                  </div>
+                )}
+
+                {/* Gradient presets (always available as fallback) */}
+                {bgType === "gradient" && (
+                  <div className="flex gap-2 flex-wrap">
+                    {GRADIENT_PRESETS.map((g, i) => (
+                      <button
+                        key={i}
+                        className={`w-8 h-8 rounded-md border-2 transition-all ${
+                          script.gradient === g && bgType === "gradient" ? "border-primary scale-110" : "border-transparent"
+                        }`}
+                        style={{ background: g }}
+                        onClick={() => handleGradientChange(g)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Slide editor */}
