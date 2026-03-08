@@ -73,6 +73,7 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
   const [editContent, setEditContent] = useState("");
   const [editStatus, setEditStatus] = useState<string>("draft");
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   // Delete dialog
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
