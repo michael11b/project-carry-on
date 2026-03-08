@@ -1152,7 +1152,13 @@ export default function VideoCreator() {
     setBgMusicBlob(null);
     setBgMusicUrl(null);
     setBgMusicName("");
+    setBgMusicDuration(0);
+    setBgMusicTrimStart(0);
+    setBgMusicTrimEnd(0);
   };
+
+  /** Effective trimmed duration of the music clip */
+  const bgMusicTrimmedDuration = bgMusicTrimEnd > bgMusicTrimStart ? bgMusicTrimEnd - bgMusicTrimStart : bgMusicDuration;
 
   const previewMaxHeight = 480;
   const previewWidth = (ratio.width / ratio.height) * previewMaxHeight;
