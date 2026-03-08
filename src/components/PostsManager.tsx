@@ -262,6 +262,21 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
             <SelectItem value="published">Published</SelectItem>
           </SelectContent>
         </Select>
+        {fbPages.length > 0 && (
+          <Select value={pageFilter} onValueChange={setPageFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All pages" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All pages</SelectItem>
+              {fbPages.map((fp) => (
+                <SelectItem key={fp.page_id} value={fp.page_id}>
+                  {fp.page_name || fp.page_id}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Posts table */}
