@@ -600,10 +600,11 @@ export default function VideoCreator() {
     return () => {
       cancelAnimationFrame(animationRef.current);
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      if (bgMusicEl) { bgMusicEl.pause(); bgMusicAudioRef.current = null; }
       if (audioCtx) { audioCtx.close().catch(() => {}); playbackAudioCtxRef.current = null; analyserRef.current = null; }
       setWaveformData(null);
     };
-  }, [isPlaying, getSlideDuration, showWaveform]);
+  }, [isPlaying, getSlideDuration, showWaveform, bgMusicUrl, bgMusicVolume]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────
 
