@@ -107,6 +107,16 @@ const MUSIC_PRESETS = [
   { value: "acoustic", label: "Acoustic", prompt: "Acoustic guitar background music, warm, gentle, organic feel" },
 ];
 
+type TransitionType = "none" | "crossfade" | "slide" | "zoom" | "wipe";
+
+const TRANSITION_OPTIONS: { value: TransitionType; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "crossfade", label: "Crossfade" },
+  { value: "slide", label: "Slide" },
+  { value: "zoom", label: "Zoom" },
+  { value: "wipe", label: "Wipe" },
+];
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function VideoCreator() {
