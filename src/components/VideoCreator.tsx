@@ -714,7 +714,51 @@ export default function VideoCreator() {
 
   const handleGradientChange = (gradient: string) => {
     if (!script) return;
+    setBgType("gradient");
+    setBgMediaUrl(null);
+    bgImageRef.current = null;
+    bgVideoRef.current = null;
     setScript({ ...script, gradient });
+  };
+
+  const handleBgFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Revoke old URL
+    if (bgMediaUrl) URL.revokeObjectURL(bgMediaUrl);
+
+    const url = URL.createObjectURL(file);
+    setBgMediaUrl(url);
+
+    if (file.type.startsWith("image/")) {
+      setBgType("image");
+      bgVideoRef.current = null;
+      const img = new Image();
+      img.onload = () => { bgImageRef.current = img; };
+      img.src = url;
+    } else if (file.type.startsWith("video/")) {
+      setBgType("video");
+      bgImageRef.current = null;
+      const video = document.createElement("video");
+      video.src = url;
+      video.loop = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.play().catch(() => {});
+      bgVideoRef.current = video;
+    }
+  };
+
+  const handleClearBgMedia = () => {
+    if (bgMediaUrl) URL.revokeObjectURL(bgMediaUrl);
+    setBgType("gradient");
+    setBgMediaUrl(null);
+    bgImageRef.current = null;
+    if (bgVideoRef.current) {
+      bgVideoRef.current.pause();
+      bgVideoRef.current = null;
+    }
   };
 
   // Preview canvas dimensions
