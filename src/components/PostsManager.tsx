@@ -65,10 +65,12 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [pageFilter, setPageFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const PAGE_SIZE = 20;
+  const [fbPages, setFbPages] = useState<{ page_id: string; page_name: string | null }[]>([]);
 
   // Edit dialog
   const [editPost, setEditPost] = useState<Post | null>(null);
