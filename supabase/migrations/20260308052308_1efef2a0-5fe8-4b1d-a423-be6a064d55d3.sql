@@ -1,0 +1,1 @@
+UPDATE scheduled_posts SET status = 'draft', publish_error = 'media_url was base64 - upload failed, cron retry stopped' WHERE id = 'c26c5e92-e3d0-47c8-be6a-94aced6129d5';
