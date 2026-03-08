@@ -820,15 +820,38 @@ export default function VideoCreator() {
               </div>
 
               {/* Waveform toggle */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <AudioWaveform className="h-4 w-4 text-muted-foreground" />
-                  <Label className="text-xs">Waveform Visualizer</Label>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AudioWaveform className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-xs">Waveform Visualizer</Label>
+                  </div>
+                  <Switch
+                    checked={showWaveform}
+                    onCheckedChange={setShowWaveform}
+                  />
                 </div>
-                <Switch
-                  checked={showWaveform}
-                  onCheckedChange={setShowWaveform}
-                />
+                {showWaveform && (
+                  <div className="flex gap-1.5">
+                    {([
+                      { value: "bars" as const, label: "Bars" },
+                      { value: "circular" as const, label: "Circular" },
+                      { value: "line" as const, label: "Line" },
+                    ]).map(style => (
+                      <button
+                        key={style.value}
+                        onClick={() => setWaveformStyle(style.value)}
+                        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                          waveformStyle === style.value
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        {style.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
