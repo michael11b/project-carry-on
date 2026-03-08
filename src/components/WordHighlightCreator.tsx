@@ -2,19 +2,26 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Sparkles, Loader2, Play, Pause, Download, Volume2, RotateCcw, Type,
+  Sparkles, Loader2, Play, Pause, Download, Volume2, RotateCcw, Type, Wand2,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 
 // ─── Types & Constants ─────────────────────────────────────────────────────
+
+interface Segment {
+  text: string;
+  voiceover: string;
+  duration: number;
+}
 
 const ASPECT_RATIOS = [
   { value: "9:16", label: "9:16 Vertical", width: 1080, height: 1920 },
@@ -60,8 +67,14 @@ export default function WordHighlightCreator() {
   const animationRef = useRef<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Input
-  const [text, setText] = useState("");
+  // Script generation
+  const [prompt, setPrompt] = useState("");
+  const [segmentCount, setSegmentCount] = useState(8);
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [scriptTitle, setScriptTitle] = useState("");
+
+  // Style
   const [aspectRatio, setAspectRatio] = useState("9:16");
   const [voiceId, setVoiceId] = useState(VOICES[0].value);
   const [gradient, setGradient] = useState(GRADIENT_PRESETS[0]);
@@ -85,9 +98,55 @@ export default function WordHighlightCreator() {
   const playStartRef = useRef(0);
 
   const ratio = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[0];
-  const words = text.trim().split(/\s+/).filter(Boolean);
 
-  // ─── Audio Helpers ──────────────────────────────────────────────────────
+  // Compute cumulative timing from segments
+  const segmentTimings = segments.map((seg, i) => {
+    const startTime = segments.slice(0, i).reduce((sum, s) => sum + s.duration, 0);
+    return { ...seg, startTime, words: seg.text.trim().split(/\s+/).filter(Boolean) };
+  });
+  const totalScriptDuration = segments.reduce((sum, s) => sum + s.duration, 0);
+  const fullVoiceover = segments.map(s => s.voiceover).join(". ");
+
+  // ─── Script Generation ──────────────────────────────────────────────────
+
+  const handleGenerateScript = async () => {
+    if (!prompt.trim()) {
+      toast({ title: "Enter a topic", description: "Describe what the video should be about.", variant: "destructive" });
+      return;
+    }
+    setIsGeneratingScript(true);
+    try {
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-word-highlight-script`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ prompt: prompt.trim(), segmentCount }),
+        }
+      );
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: "Generation failed" }));
+        throw new Error(err.error || "Generation failed");
+      }
+      const data = await resp.json();
+      setSegments(data.segments || []);
+      setScriptTitle(data.title || "");
+      if (data.gradient) setGradient(data.gradient);
+      setAudioBlob(null);
+      setAudioDuration(0);
+      toast({ title: "Script generated!", description: `${data.segments?.length || 0} segments created.` });
+    } catch (e) {
+      toast({ title: "Script generation failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  };
+
+  // ─── Audio Generation ───────────────────────────────────────────────────
 
   const getAudioBlobDuration = (blob: Blob): Promise<number> =>
     new Promise((resolve) => {
@@ -99,17 +158,15 @@ export default function WordHighlightCreator() {
           audio.addEventListener("durationchange", () => {
             if (isFinite(audio.duration)) { resolve(audio.duration); URL.revokeObjectURL(url); }
           });
-          setTimeout(() => { resolve(5); URL.revokeObjectURL(url); }, 5000);
+          setTimeout(() => { resolve(totalScriptDuration); URL.revokeObjectURL(url); }, 5000);
         }
       });
-      audio.addEventListener("error", () => { resolve(5); URL.revokeObjectURL(url); });
+      audio.addEventListener("error", () => { resolve(totalScriptDuration); URL.revokeObjectURL(url); });
     });
 
-  // ─── Generate Audio ─────────────────────────────────────────────────────
-
   const handleGenerateAudio = async () => {
-    if (!text.trim()) {
-      toast({ title: "Enter text", description: "Write the text for the video.", variant: "destructive" });
+    if (segments.length === 0) {
+      toast({ title: "No script", description: "Generate a script first.", variant: "destructive" });
       return;
     }
     setIsGeneratingAudio(true);
@@ -123,7 +180,7 @@ export default function WordHighlightCreator() {
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({ text: text.trim(), voiceId }),
+          body: JSON.stringify({ text: fullVoiceover, voiceId }),
         }
       );
       if (!response.ok) {
@@ -134,7 +191,7 @@ export default function WordHighlightCreator() {
       const dur = await getAudioBlobDuration(blob);
       setAudioBlob(blob);
       setAudioDuration(dur);
-      toast({ title: "Audio generated!", description: `${dur.toFixed(1)}s voiceover ready.` });
+      toast({ title: "Voiceover generated!", description: `${dur.toFixed(1)}s audio ready.` });
     } catch (e) {
       toast({ title: "Audio generation failed", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -142,14 +199,46 @@ export default function WordHighlightCreator() {
     }
   };
 
-  // ─── Canvas Rendering ───────────────────────────────────────────────────
+  // ─── Find current segment & word from elapsed time ──────────────────────
+
+  const getSegmentAndWord = useCallback((elapsed: number, duration: number) => {
+    if (segmentTimings.length === 0) return { segmentIndex: 0, wordIndex: 0, wordProgress: 0 };
+
+    // Scale elapsed to match segment durations proportionally against actual audio duration
+    const scale = duration > 0 ? totalScriptDuration / duration : 1;
+    const scaledElapsed = elapsed * scale;
+
+    let segmentIndex = 0;
+    for (let i = 0; i < segmentTimings.length; i++) {
+      const seg = segmentTimings[i];
+      if (scaledElapsed >= seg.startTime && scaledElapsed < seg.startTime + seg.duration) {
+        segmentIndex = i;
+        break;
+      }
+      if (i === segmentTimings.length - 1) segmentIndex = i;
+    }
+
+    const seg = segmentTimings[segmentIndex];
+    const timeInSegment = scaledElapsed - seg.startTime;
+    const wordCount = seg.words.length;
+    const wordDuration = seg.duration / Math.max(wordCount, 1);
+    const wordIndex = Math.min(Math.floor(timeInSegment / wordDuration), wordCount - 1);
+    const wordProgress = (timeInSegment % wordDuration) / wordDuration;
+
+    return { segmentIndex, wordIndex: Math.max(wordIndex, 0), wordProgress };
+  }, [segmentTimings, totalScriptDuration]);
+
+  // ─── Canvas Rendering (shows only current segment's words) ──────────────
 
   const drawFrame = useCallback((
     ctx: CanvasRenderingContext2D,
-    wordList: string[],
+    segWords: string[],
     currentWordIndex: number,
     wordProgress: number,
     phase: number,
+    segIdx: number,
+    totalSegs: number,
+    elapsedRatio: number,
     opts: {
       gradient: string;
       font: string;
@@ -186,56 +275,59 @@ export default function WordHighlightCreator() {
       ctx.fill();
     }
 
-    if (wordList.length === 0) return;
+    if (segWords.length === 0) return;
 
-    // ── Word Layout ───────────────────────────────────────────────────
-    const baseFontSize = Math.min(width, height) * 0.055;
+    // ── Segment indicator (top) ───────────────────────────────────────
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    ctx.font = `${Math.round(width * 0.022)}px ${opts.font}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(`${segIdx + 1} / ${totalSegs}`, width / 2, height * 0.05);
+
+    // ── Word Layout (centered, only current segment) ──────────────────
+    const baseFontSize = Math.min(width, height) * 0.08;
     const weight = opts.bold ? "bold" : "normal";
     const maxWidth = width * 0.85;
-    const lineHeight = baseFontSize * 1.6;
+    const lineHeight = baseFontSize * 1.8;
 
-    // Measure words at base size
     ctx.font = `${weight} ${baseFontSize}px ${opts.font}`;
     const spaceWidth = ctx.measureText(" ").width;
 
-    // Build lines
-    type WordMeta = { word: string; globalIndex: number; x: number; width: number };
-    type LineMeta = { words: WordMeta[]; y: number; totalWidth: number };
+    type WordMeta = { word: string; idx: number; x: number; w: number };
+    type LineMeta = { words: WordMeta[]; y: number };
     const lines: LineMeta[] = [];
     let curLine: WordMeta[] = [];
-    let curWidth = 0;
+    let curW = 0;
 
-    for (let i = 0; i < wordList.length; i++) {
-      const w = wordList[i];
-      const ww = ctx.measureText(w).width;
-      const neededWidth = curLine.length > 0 ? spaceWidth + ww : ww;
+    for (let i = 0; i < segWords.length; i++) {
+      const word = segWords[i];
+      const ww = ctx.measureText(word).width;
+      const needed = curLine.length > 0 ? spaceWidth + ww : ww;
 
-      if (curWidth + neededWidth > maxWidth && curLine.length > 0) {
-        lines.push({ words: curLine, y: 0, totalWidth: curWidth });
-        curLine = [{ word: w, globalIndex: i, x: 0, width: ww }];
-        curWidth = ww;
+      if (curW + needed > maxWidth && curLine.length > 0) {
+        lines.push({ words: curLine, y: 0 });
+        curLine = [{ word, idx: i, x: 0, w: ww }];
+        curW = ww;
       } else {
-        curLine.push({ word: w, globalIndex: i, x: 0, width: ww });
-        curWidth += neededWidth;
+        curLine.push({ word, idx: i, x: 0, w: ww });
+        curW += needed;
       }
     }
-    if (curLine.length > 0) lines.push({ words: curLine, y: 0, totalWidth: curWidth });
+    if (curLine.length > 0) lines.push({ words: curLine, y: 0 });
 
-    // Position lines centered vertically
     const totalH = lines.length * lineHeight;
     const startY = height / 2 - totalH / 2 + lineHeight / 2;
 
     for (let li = 0; li < lines.length; li++) {
       const line = lines[li];
       line.y = startY + li * lineHeight;
-      // Position words within line (centered)
       let lw = 0;
-      for (const wm of line.words) lw += wm.width;
+      for (const wm of line.words) lw += wm.w;
       lw += (line.words.length - 1) * spaceWidth;
       let cx = (width - lw) / 2;
       for (const wm of line.words) {
         wm.x = cx;
-        cx += wm.width + spaceWidth;
+        cx += wm.w + spaceWidth;
       }
     }
 
@@ -245,15 +337,15 @@ export default function WordHighlightCreator() {
 
     for (const line of lines) {
       for (const wm of line.words) {
-        const isHighlighted = wm.globalIndex < currentWordIndex;
-        const isCurrent = wm.globalIndex === currentWordIndex;
+        const isHighlighted = wm.idx < currentWordIndex;
+        const isCurrent = wm.idx === currentWordIndex;
 
         let scale = 1;
         let color = opts.baseColor;
-        let alpha = 0.5;
+        let alpha = 0.45;
 
         if (isHighlighted) {
-          alpha = 0.7;
+          alpha = 0.65;
           if (opts.highlightStyle === "color" || opts.highlightStyle === "both") {
             color = opts.highlightColor;
           }
@@ -265,7 +357,6 @@ export default function WordHighlightCreator() {
             color = opts.highlightColor;
           }
           if (opts.highlightStyle === "enlarge" || opts.highlightStyle === "both") {
-            // Smooth scale animation: grow quickly then settle
             const growT = Math.min(wordProgress * 3, 1);
             const eased = 1 - Math.pow(1 - growT, 3);
             scale = 1 + (opts.enlargeScale - 1) * eased;
@@ -275,20 +366,13 @@ export default function WordHighlightCreator() {
         const fontSize = baseFontSize * scale;
         ctx.font = `${weight} ${fontSize}px ${opts.font}`;
         ctx.globalAlpha = alpha;
-        ctx.shadowColor = "rgba(0,0,0,0.4)";
-        ctx.shadowBlur = isCurrent ? 25 : 10;
+        ctx.shadowColor = isCurrent ? opts.highlightColor : "rgba(0,0,0,0.4)";
+        ctx.shadowBlur = isCurrent ? 30 : 10;
         ctx.shadowOffsetY = 2;
 
-        // Center the scaled word around its original position
         const scaledWidth = ctx.measureText(wm.word).width;
-        const origCenter = wm.x + wm.width / 2;
+        const origCenter = wm.x + wm.w / 2;
         const drawX = origCenter - scaledWidth / 2;
-
-        // If current word, add a subtle glow
-        if (isCurrent) {
-          ctx.shadowColor = opts.highlightColor;
-          ctx.shadowBlur = 30;
-        }
 
         ctx.fillStyle = color;
         ctx.fillText(wm.word, drawX, line.y);
@@ -302,9 +386,8 @@ export default function WordHighlightCreator() {
     // ── Progress bar at bottom ────────────────────────────────────────
     const barY = height * 0.92;
     const barW = width * 0.7;
-    const barH = 4;
+    const barH = 6;
     const barX = (width - barW) / 2;
-    const totalProgress = wordList.length > 0 ? (currentWordIndex + wordProgress) / wordList.length : 0;
 
     ctx.fillStyle = "rgba(255,255,255,0.15)";
     ctx.beginPath();
@@ -313,7 +396,7 @@ export default function WordHighlightCreator() {
 
     ctx.fillStyle = "rgba(255,255,255,0.8)";
     ctx.beginPath();
-    ctx.roundRect(barX, barY, barW * totalProgress, barH, barH / 2);
+    ctx.roundRect(barX, barY, barW * elapsedRatio, barH, barH / 2);
     ctx.fill();
   }, []);
 
@@ -321,7 +404,7 @@ export default function WordHighlightCreator() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || segmentTimings.length === 0) return;
 
     const previewScale = 0.3;
     canvas.width = ratio.width * previewScale;
@@ -334,18 +417,19 @@ export default function WordHighlightCreator() {
     const virtualCanvas = { width: ratio.width, height: ratio.height } as HTMLCanvasElement;
     Object.defineProperty(ctx, "canvas", { value: virtualCanvas, configurable: true });
 
-    // For static preview, show the text with a simulated current word
-    const wordIdx = Math.min(Math.floor(words.length * 0.3), words.length - 1);
-    drawFrame(ctx, words, Math.max(wordIdx, 0), 0.5, gradientPhase, {
+    // Show first segment with a simulated highlight
+    const seg = segmentTimings[0];
+    const previewWordIdx = Math.min(Math.floor(seg.words.length * 0.4), seg.words.length - 1);
+    drawFrame(ctx, seg.words, Math.max(previewWordIdx, 0), 0.5, gradientPhase, 0, segments.length, 0.15, {
       gradient, font, bold, baseColor, highlightColor, highlightStyle, enlargeScale,
     });
     ctx.restore();
-  }, [text, gradient, font, bold, baseColor, highlightColor, highlightStyle, enlargeScale, ratio, gradientPhase, drawFrame, words]);
+  }, [segments, gradient, font, bold, baseColor, highlightColor, highlightStyle, enlargeScale, ratio, gradientPhase, drawFrame, segmentTimings]);
 
   // ─── Playback loop ─────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!isPlaying || !audioBlob) return;
+    if (!isPlaying || !audioBlob || segmentTimings.length === 0) return;
 
     const url = URL.createObjectURL(audioBlob);
     const audio = new Audio(url);
@@ -366,15 +450,11 @@ export default function WordHighlightCreator() {
       setPlaybackTime(elapsed);
       setGradientPhase(phase);
 
-      // Calculate current word index based on elapsed time
-      // Distribute words evenly across the audio duration
-      const totalWords = words.length;
-      const wordDuration = audioDuration / totalWords;
-      const currentWordIdx = Math.min(Math.floor(elapsed / wordDuration), totalWords - 1);
-      const wordProgress = (elapsed % wordDuration) / wordDuration;
+      const { segmentIndex, wordIndex, wordProgress } = getSegmentAndWord(elapsed, audioDuration);
+      const seg = segmentTimings[segmentIndex];
 
       const canvas = canvasRef.current;
-      if (canvas) {
+      if (canvas && seg) {
         const previewScale = 0.3;
         canvas.width = ratio.width * previewScale;
         canvas.height = ratio.height * previewScale;
@@ -384,7 +464,7 @@ export default function WordHighlightCreator() {
           ctx.scale(previewScale, previewScale);
           const virtualCanvas = { width: ratio.width, height: ratio.height } as HTMLCanvasElement;
           Object.defineProperty(ctx, "canvas", { value: virtualCanvas, configurable: true });
-          drawFrame(ctx, words, currentWordIdx, wordProgress, phase, {
+          drawFrame(ctx, seg.words, wordIndex, wordProgress, phase, segmentIndex, segments.length, elapsed / audioDuration, {
             gradient, font, bold, baseColor, highlightColor, highlightStyle, enlargeScale,
           });
           ctx.restore();
@@ -404,12 +484,12 @@ export default function WordHighlightCreator() {
       URL.revokeObjectURL(url);
       audioRef.current = null;
     };
-  }, [isPlaying, audioBlob, audioDuration, words, drawFrame, gradient, font, bold, baseColor, highlightColor, highlightStyle, enlargeScale, ratio]);
+  }, [isPlaying, audioBlob, audioDuration, segmentTimings, segments.length, drawFrame, getSegmentAndWord, gradient, font, bold, baseColor, highlightColor, highlightStyle, enlargeScale, ratio]);
 
   // ─── Export ─────────────────────────────────────────────────────────────
 
   const handleExport = async () => {
-    if (!audioBlob || words.length === 0) return;
+    if (!audioBlob || segments.length === 0) return;
     setIsRecording(true);
     toast({ title: "Recording video…", description: "Please wait." });
 
@@ -421,9 +501,8 @@ export default function WordHighlightCreator() {
       const stream = offscreen.captureStream(30);
       const audioContext = new AudioContext();
       const destination = audioContext.createMediaStreamDestination();
-      stream.addTrack(destination.stream.getAudioTracks()[0] || stream.getVideoTracks()[0]);
+      stream.addTrack(destination.stream.getAudioTracks()[0]);
 
-      // Decode and play audio into the stream
       const ab = await audioBlob.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(ab);
       const source = audioContext.createBufferSource();
@@ -450,19 +529,20 @@ export default function WordHighlightCreator() {
       mediaRecorder.start();
 
       let phase = 0;
-      const totalWords = words.length;
-      const wordDuration = audioDuration / totalWords;
       const startTime = Date.now();
 
       while ((Date.now() - startTime) / 1000 < audioDuration + 0.5) {
         const elapsed = (Date.now() - startTime) / 1000;
         phase += 1;
-        const currentWordIdx = Math.min(Math.floor(elapsed / wordDuration), totalWords - 1);
-        const wordProgress = (elapsed % wordDuration) / wordDuration;
 
-        drawFrame(offCtx, words, currentWordIdx, wordProgress, phase, {
-          gradient, font, bold, baseColor, highlightColor, highlightStyle, enlargeScale,
-        });
+        const { segmentIndex, wordIndex, wordProgress } = getSegmentAndWord(elapsed, audioDuration);
+        const seg = segmentTimings[segmentIndex];
+
+        if (seg) {
+          drawFrame(offCtx, seg.words, wordIndex, wordProgress, phase, segmentIndex, segments.length, elapsed / audioDuration, {
+            gradient, font, bold, baseColor, highlightColor, highlightStyle, enlargeScale,
+          });
+        }
         await new Promise(r => setTimeout(r, 33));
       }
 
@@ -491,20 +571,89 @@ export default function WordHighlightCreator() {
             Word Highlight Video
           </h3>
 
-          <div className="space-y-2">
-            <Label>Script Text</Label>
-            <Textarea
-              placeholder="Type or paste the full script here. Each word will be highlighted as the voiceover narrates…"
-              className="min-h-[120px] resize-none"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              disabled={isPlaying}
+          {/* Step 1: Script Generation */}
+          <div className="space-y-3 border border-border rounded-lg p-3">
+            <Label className="text-xs font-medium flex items-center gap-1.5">
+              <Wand2 className="h-3.5 w-3.5" /> Step 1: Generate Script
+            </Label>
+            <Input
+              placeholder="E.g. 5 tips for morning productivity…"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              disabled={isGeneratingScript}
             />
-            {words.length > 0 && (
-              <p className="text-[10px] text-muted-foreground">{words.length} words</p>
-            )}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-1">
+                <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Segments</Label>
+                <Slider
+                  value={[segmentCount]}
+                  min={4} max={15} step={1}
+                  onValueChange={([v]) => setSegmentCount(v)}
+                  className="flex-1"
+                />
+                <span className="text-[10px] text-muted-foreground w-4">{segmentCount}</span>
+              </div>
+              <Button
+                onClick={handleGenerateScript}
+                disabled={isGeneratingScript || !prompt.trim()}
+                size="sm"
+                className="gap-1.5"
+              >
+                {isGeneratingScript ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating…</>
+                ) : (
+                  <><Sparkles className="h-3.5 w-3.5" /> Generate</>
+                )}
+              </Button>
+            </div>
           </div>
 
+          {/* Generated Script */}
+          {segments.length > 0 && (
+            <div className="space-y-2 border border-border rounded-lg p-3">
+              <Label className="text-xs font-medium">
+                Script: {scriptTitle} ({segments.length} segments, ~{totalScriptDuration.toFixed(1)}s)
+              </Label>
+              <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                {segments.map((seg, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs">
+                    <Badge variant="outline" className="text-[9px] shrink-0 mt-0.5">
+                      {segmentTimings[i]?.startTime.toFixed(1)}s
+                    </Badge>
+                    <Textarea
+                      value={seg.text}
+                      onChange={(e) => {
+                        const updated = [...segments];
+                        updated[i] = { ...updated[i], text: e.target.value, voiceover: e.target.value };
+                        setSegments(updated);
+                        setAudioBlob(null);
+                      }}
+                      className="min-h-[32px] text-xs p-1.5 resize-none"
+                      rows={1}
+                    />
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Input
+                        type="number"
+                        value={seg.duration}
+                        onChange={(e) => {
+                          const updated = [...segments];
+                          updated[i] = { ...updated[i], duration: parseFloat(e.target.value) || 2 };
+                          setSegments(updated);
+                        }}
+                        className="w-14 h-7 text-[10px] p-1"
+                        step={0.5}
+                        min={1}
+                        max={6}
+                      />
+                      <span className="text-[9px] text-muted-foreground">s</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Format / Voice */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-xs">Format</Label>
@@ -550,7 +699,6 @@ export default function WordHighlightCreator() {
           {/* Styling */}
           <div className="space-y-3 border border-border rounded-lg p-3">
             <Label className="text-xs font-medium">Text Styling</Label>
-
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label className="text-[10px] text-muted-foreground">Font</Label>
@@ -595,28 +743,23 @@ export default function WordHighlightCreator() {
               </div>
               <div className="flex items-center gap-1.5">
                 <Label className="text-[10px]">Base</Label>
-                <input
-                  type="color" value={baseColor}
-                  onChange={(e) => setBaseColor(e.target.value)}
-                  className="w-6 h-6 rounded border border-border cursor-pointer"
-                />
+                <input type="color" value={baseColor} onChange={(e) => setBaseColor(e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer" />
               </div>
               <div className="flex items-center gap-1.5">
                 <Label className="text-[10px]">Highlight</Label>
-                <input
-                  type="color" value={highlightColor}
-                  onChange={(e) => setHighlightColor(e.target.value)}
-                  className="w-6 h-6 rounded border border-border cursor-pointer"
-                />
+                <input type="color" value={highlightColor} onChange={(e) => setHighlightColor(e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer" />
               </div>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex flex-col gap-2">
+          {/* Step 2: Generate Audio */}
+          <div className="space-y-2 border border-border rounded-lg p-3">
+            <Label className="text-xs font-medium flex items-center gap-1.5">
+              <Volume2 className="h-3.5 w-3.5" /> Step 2: Generate Voiceover
+            </Label>
             <Button
               onClick={handleGenerateAudio}
-              disabled={isGeneratingAudio || !text.trim()}
+              disabled={isGeneratingAudio || segments.length === 0}
               variant="secondary"
               className="w-full gap-2"
             >
@@ -626,37 +769,33 @@ export default function WordHighlightCreator() {
                 <><Volume2 className="h-4 w-4" /> {audioBlob ? "Regenerate" : "Generate"} Voiceover</>
               )}
             </Button>
-
             {audioBlob && (
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-[10px]">
-                  {audioDuration.toFixed(1)}s audio ready
-                </Badge>
-                <Badge variant="outline" className="text-[10px]">
-                  ~{(audioDuration / Math.max(words.length, 1)).toFixed(2)}s per word
-                </Badge>
+                <Badge variant="secondary" className="text-[10px]">{audioDuration.toFixed(1)}s audio</Badge>
+                <Badge variant="outline" className="text-[10px]">{segments.length} segments</Badge>
               </div>
             )}
-
-            <Button
-              onClick={handleExport}
-              disabled={isRecording || !audioBlob}
-              className="w-full gap-2"
-            >
-              {isRecording ? (
-                <><Loader2 className="h-4 w-4 animate-spin" /> Recording…</>
-              ) : (
-                <><Download className="h-4 w-4" /> Export Video</>
-              )}
-            </Button>
           </div>
+
+          {/* Step 3: Export */}
+          <Button
+            onClick={handleExport}
+            disabled={isRecording || !audioBlob}
+            className="w-full gap-2"
+          >
+            {isRecording ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Recording…</>
+            ) : (
+              <><Download className="h-4 w-4" /> Export Video</>
+            )}
+          </Button>
         </CardContent>
       </Card>
 
       {/* Right: Preview */}
       <Card>
         <CardContent className="p-6 flex flex-col items-center justify-center min-h-[400px]">
-          {text.trim() ? (
+          {segments.length > 0 ? (
             <>
               <div className="relative rounded-lg overflow-hidden shadow-2xl border border-border" style={{ width: previewWidth, maxWidth: "100%" }}>
                 <canvas
@@ -665,7 +804,6 @@ export default function WordHighlightCreator() {
                 />
               </div>
 
-              {/* Playback controls */}
               {audioBlob && (
                 <div className="flex items-center gap-3 mt-4">
                   <Button
@@ -693,14 +831,14 @@ export default function WordHighlightCreator() {
               )}
 
               <p className="text-xs text-muted-foreground mt-3 text-center max-w-[300px]">
-                Words will highlight and enlarge one by one as the voiceover plays.
+                Each segment shows only its words — highlighted one by one as the voiceover plays.
               </p>
             </>
           ) : (
             <div className="text-center text-muted-foreground">
               <Type className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
               <p className="text-lg font-medium">Word Highlight Preview</p>
-              <p className="text-sm mt-1">Enter your script text to see the preview</p>
+              <p className="text-sm mt-1">Generate a script to see the preview</p>
             </div>
           )}
         </CardContent>
