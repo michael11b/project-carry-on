@@ -1113,9 +1113,13 @@ export default function VideoCreator() {
       const blob = await response.blob();
       if (bgMusicUrl) URL.revokeObjectURL(bgMusicUrl);
       const url = URL.createObjectURL(blob);
+      const dur = await getAudioBlobDuration(blob);
       setBgMusicBlob(blob);
       setBgMusicUrl(url);
       setBgMusicName(preset.label);
+      setBgMusicDuration(dur);
+      setBgMusicTrimStart(0);
+      setBgMusicTrimEnd(dur);
       toast({ title: "Music generated!", description: `${preset.label} track ready.` });
     } catch (e) {
       toast({ title: "Music generation failed", description: (e as Error).message, variant: "destructive" });
