@@ -230,6 +230,7 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
               className="h-8 text-sm"
               disabled={publishing}
             />
+          </div>
 
           <div className="space-y-2">
             <Label className="text-xs">Caption / Post Text</Label>
