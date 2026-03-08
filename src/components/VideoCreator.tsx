@@ -71,6 +71,7 @@ export default function VideoCreator() {
 
   // Audio state
   const [audioBlobs, setAudioBlobs] = useState<Map<number, Blob>>(new Map());
+  const [audioDurations, setAudioDurations] = useState<Map<number, number>>(new Map());
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [audioProgress, setAudioProgress] = useState(0);
 
@@ -86,6 +87,46 @@ export default function VideoCreator() {
   const recordedChunks = useRef<Blob[]>([]);
 
   const ratio = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[0];
+
+  // Measure actual duration of an audio blob
+  const getAudioBlobDuration = (blob: Blob): Promise<number> => {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.addEventListener("loadedmetadata", () => {
+        // Some browsers return Infinity for streaming audio, handle that
+        if (isFinite(audio.duration)) {
+          resolve(audio.duration);
+        } else {
+          // Fallback: listen for durationchange
+          audio.addEventListener("durationchange", () => {
+            if (isFinite(audio.duration)) {
+              resolve(audio.duration);
+              URL.revokeObjectURL(url);
+            }
+          });
+          // If still can't get it, use a reasonable default after timeout
+          setTimeout(() => resolve(3), 5000);
+        }
+        URL.revokeObjectURL(url);
+      });
+      audio.addEventListener("error", () => {
+        resolve(3); // fallback
+        URL.revokeObjectURL(url);
+      });
+    });
+  };
+
+  // Get effective slide duration: use audio duration if available, otherwise fallback to script duration + padding
+  const getSlideDuration = useCallback((slideIndex: number): number => {
+    const audioDur = audioDurations.get(slideIndex);
+    const scriptDur = script?.slides[slideIndex]?.duration || 3;
+    if (audioDur && audioDur > 0) {
+      // Use audio duration + 0.5s padding for breathing room
+      return Math.max(audioDur + 0.5, scriptDur);
+    }
+    return scriptDur;
+  }, [audioDurations, script]);
 
   // Canvas rendering
   const drawFrame = useCallback((ctx: CanvasRenderingContext2D, slide: Slide, phase: number, opacity: number) => {
@@ -201,18 +242,19 @@ export default function VideoCreator() {
 
     const animate = () => {
       const elapsed = (Date.now() - slideStartTime) / 1000;
-      const slideDuration = script.slides[slideIndex].duration;
+      const slideDuration = getSlideDuration(slideIndex);
       phase += 1;
 
       // Text fade in/out
       let opacity = 1;
-      if (elapsed < 0.3) opacity = elapsed / 0.3;
-      else if (elapsed > slideDuration - 0.3) opacity = Math.max(0, (slideDuration - elapsed) / 0.3);
+      const fadeTime = 0.3;
+      if (elapsed < fadeTime) opacity = elapsed / fadeTime;
+      else if (elapsed > slideDuration - fadeTime) opacity = Math.max(0, (slideDuration - elapsed) / fadeTime);
 
       setGradientPhase(phase);
       setTextOpacity(opacity);
 
-      // Move to next slide
+      // Move to next slide when duration is reached
       if (elapsed >= slideDuration) {
         const nextIndex = slideIndex + 1;
         if (nextIndex >= script.slides.length) {
@@ -224,7 +266,7 @@ export default function VideoCreator() {
         setCurrentSlide(nextIndex);
         slideStartTime = Date.now();
 
-        // Play audio for this slide
+        // Play audio for next slide
         const audioBlob = audioBlobs.get(nextIndex);
         if (audioBlob) {
           const url = URL.createObjectURL(audioBlob);
@@ -256,7 +298,7 @@ export default function VideoCreator() {
         audioRef.current = null;
       }
     };
-  }, [isPlaying]);
+  }, [isPlaying, getSlideDuration]);
 
   const handleGenerateScript = async () => {
     if (!prompt.trim()) {
@@ -275,6 +317,7 @@ export default function VideoCreator() {
       setScript(data);
       setCurrentSlide(0);
       setAudioBlobs(new Map());
+      setAudioDurations(new Map());
       toast({ title: "Script generated!", description: `${data.slides.length} slides created.` });
     } catch (e) {
       toast({ title: "Generation failed", description: (e as Error).message, variant: "destructive" });
@@ -288,6 +331,7 @@ export default function VideoCreator() {
     setIsGeneratingAudio(true);
     setAudioProgress(0);
     const newBlobs = new Map<number, Blob>();
+    const newDurations = new Map<number, number>();
 
     try {
       for (let i = 0; i < script.slides.length; i++) {
@@ -315,10 +359,15 @@ export default function VideoCreator() {
 
         const blob = await response.blob();
         newBlobs.set(i, blob);
+
+        // Measure actual audio duration
+        const duration = await getAudioBlobDuration(blob);
+        newDurations.set(i, duration);
       }
 
       setAudioBlobs(newBlobs);
-      toast({ title: "Audio generated!", description: `${script.slides.length} voiceovers ready.` });
+      setAudioDurations(newDurations);
+      toast({ title: "Audio generated!", description: `${script.slides.length} voiceovers ready. Slide durations synced to audio.` });
     } catch (e) {
       toast({ title: "Audio generation failed", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -375,7 +424,7 @@ export default function VideoCreator() {
       let phase = 0;
       for (let s = 0; s < script.slides.length; s++) {
         const slide = script.slides[s];
-        const durationMs = slide.duration * 1000;
+        const durationMs = getSlideDuration(s) * 1000;
         const startTime = Date.now();
 
         // Play audio for this slide
@@ -395,9 +444,10 @@ export default function VideoCreator() {
           const elapsed = (Date.now() - startTime) / 1000;
           phase += 1;
 
+          const slideDurSec = durationMs / 1000;
           let opacity = 1;
           if (elapsed < 0.3) opacity = elapsed / 0.3;
-          else if (elapsed > slide.duration - 0.3) opacity = Math.max(0, (slide.duration - elapsed) / 0.3);
+          else if (elapsed > slideDurSec - 0.3) opacity = Math.max(0, (slideDurSec - elapsed) / 0.3);
 
           drawFrame(offCtx, slide, phase, opacity);
           await new Promise(r => setTimeout(r, 33)); // ~30fps
@@ -550,8 +600,10 @@ export default function VideoCreator() {
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant="secondary" className="text-[10px]">Slide {i + 1}</Badge>
-                      <span className="text-[10px] text-muted-foreground">{slide.duration}s</span>
-                      {audioBlobs.has(i) && <Volume2 className="h-3 w-3 text-green-500" />}
+                      <span className="text-[10px] text-muted-foreground">
+                        {audioDurations.has(i) ? `${getSlideDuration(i).toFixed(1)}s (audio: ${audioDurations.get(i)!.toFixed(1)}s)` : `${slide.duration}s`}
+                      </span>
+                      {audioBlobs.has(i) && <Volume2 className="h-3 w-3 text-green-600" />}
                     </div>
                     <Input
                       value={slide.text}
