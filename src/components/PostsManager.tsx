@@ -65,10 +65,12 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [pageFilter, setPageFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const PAGE_SIZE = 20;
+  const [fbPages, setFbPages] = useState<{ page_id: string; page_name: string | null }[]>([]);
 
   // Edit dialog
   const [editPost, setEditPost] = useState<Post | null>(null);
@@ -86,6 +88,16 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
   // View dialog
   const [viewPost, setViewPost] = useState<Post | null>(null);
 
+  // Fetch Facebook pages for filter
+  useEffect(() => {
+    if (!orgId) return;
+    supabase
+      .from("facebook_pages")
+      .select("page_id, page_name")
+      .eq("org_id", orgId)
+      .then(({ data }) => setFbPages(data || []));
+  }, [orgId]);
+
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
@@ -99,6 +111,9 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
       if (statusFilter !== "all") {
         query = query.eq("status", statusFilter as any);
       }
+      if (pageFilter !== "all") {
+        query = query.eq("facebook_page_id", pageFilter);
+      }
 
       const { data, error, count } = await query;
       if (error) throw error;
@@ -109,7 +124,7 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
     } finally {
       setLoading(false);
     }
-  }, [orgId, statusFilter, page, toast]);
+  }, [orgId, statusFilter, pageFilter, page, toast]);
 
   useEffect(() => {
     if (orgId) fetchPosts();
@@ -118,7 +133,7 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
   // Reset page when filters change
   useEffect(() => {
     setPage(0);
-  }, [statusFilter, searchQuery]);
+  }, [statusFilter, pageFilter, searchQuery]);
 
   const filteredPosts = posts.filter((p) => {
     if (!searchQuery) return true;
@@ -247,6 +262,21 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
             <SelectItem value="published">Published</SelectItem>
           </SelectContent>
         </Select>
+        {fbPages.length > 0 && (
+          <Select value={pageFilter} onValueChange={setPageFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All pages" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All pages</SelectItem>
+              {fbPages.map((fp) => (
+                <SelectItem key={fp.page_id} value={fp.page_id}>
+                  {fp.page_name || fp.page_id}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Posts table */}
