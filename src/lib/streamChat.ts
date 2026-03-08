@@ -9,6 +9,8 @@ interface StreamGenerateOptions {
   };
   channel?: string;
   variantCount?: number;
+  contentType?: string;
+  pageContext?: Record<string, unknown>;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
@@ -19,6 +21,8 @@ export async function streamGenerate({
   brandVoice,
   channel,
   variantCount,
+  contentType,
+  pageContext,
   onDelta,
   onDone,
   onError,
@@ -29,7 +33,7 @@ export async function streamGenerate({
       "Content-Type": "application/json",
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ prompt, brandVoice, channel, variantCount }),
+    body: JSON.stringify({ prompt, brandVoice, channel, variantCount, contentType, pageContext }),
   });
 
   if (!resp.ok) {

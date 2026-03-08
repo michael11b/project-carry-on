@@ -10,12 +10,34 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { prompt, brandVoice, channel, variantCount } = await req.json();
+    const { prompt, brandVoice, channel, variantCount, contentType, pageContext } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Build system prompt
-    let systemPrompt = `You are a world-class content strategist and copywriter. Generate high-quality marketing content based on the user's prompt.`;
+    // Build system prompt with content type context
+    let systemPrompt = `You are a world-class content strategist and copywriter.`;
+
+    // Add content type context
+    if (contentType === "facebook_post") {
+      systemPrompt += `\n\nYou are creating a Facebook page post. The output should be ready to publish directly to Facebook. Include engaging copy that drives likes, comments, and shares. Keep it concise but impactful. Use emojis sparingly. Do NOT include image descriptions or placeholders — just the text content for the post.`;
+    } else if (contentType === "instagram_caption") {
+      systemPrompt += `\n\nYou are writing an Instagram caption. Make it engaging, use relevant hashtags at the end, and include a call-to-action. Use emojis naturally.`;
+    } else {
+      systemPrompt += `\n\nGenerate high-quality marketing content based on the user's prompt.`;
+    }
+
+    // Add page-specific context if provided
+    if (pageContext) {
+      systemPrompt += `\n\n## Page Context`;
+      if (pageContext.page_name) systemPrompt += `\nPage: ${pageContext.page_name}`;
+      if (pageContext.description) systemPrompt += `\nAbout: ${pageContext.description}`;
+      if (pageContext.target_audience) systemPrompt += `\nTarget Audience: ${pageContext.target_audience}`;
+      if (pageContext.content_tone) systemPrompt += `\nTone: ${pageContext.content_tone}`;
+      if (pageContext.content_topics?.length) systemPrompt += `\nKey Topics: ${pageContext.content_topics.join(", ")}`;
+      if (pageContext.posting_goals) systemPrompt += `\nGoals: ${pageContext.posting_goals}`;
+      if (pageContext.hashtag_preferences) systemPrompt += `\nPreferred Hashtags: ${pageContext.hashtag_preferences}`;
+      if (pageContext.custom_system_prompt) systemPrompt += `\n\n## Additional Instructions\n${pageContext.custom_system_prompt}`;
+    }
 
     if (channel) {
       const channelGuides: Record<string, string> = {
