@@ -33,7 +33,7 @@ export async function streamGenerate({
       "Content-Type": "application/json",
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ prompt, brandVoice, channel, variantCount }),
+    body: JSON.stringify({ prompt, brandVoice, channel, variantCount, contentType, pageContext }),
   });
 
   if (!resp.ok) {
