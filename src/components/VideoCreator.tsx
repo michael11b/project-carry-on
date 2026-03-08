@@ -593,6 +593,16 @@ export default function VideoCreator() {
     let slideStartTime = Date.now();
     let slideIndex = currentSlide;
     let phase = gradientPhase;
+    let inTransition = false;
+    let transStartTime = 0;
+
+    // Create offscreen canvases for transition compositing
+    const outCanvas = document.createElement("canvas");
+    const inCanvas = document.createElement("canvas");
+    outCanvas.width = ratio.width;
+    outCanvas.height = ratio.height;
+    inCanvas.width = ratio.width;
+    inCanvas.height = ratio.height;
 
     let audioCtx: AudioContext | null = null;
     let analyser: AnalyserNode | null = null;
@@ -640,6 +650,9 @@ export default function VideoCreator() {
       bgMusicEl.play().catch(() => {});
     }
 
+    const tType = transitionType;
+    const tDur = transitionDuration;
+
     const animate = () => {
       const elapsed = (Date.now() - slideStartTime) / 1000;
       const slideDuration = getSlideDuration(slideIndex);
@@ -663,6 +676,63 @@ export default function VideoCreator() {
       setGradientPhase(phase);
       setTextOpacity(opacity);
 
+      // Check if we should start a transition
+      const nextIndex = slideIndex + 1;
+      const hasNext = nextIndex < script.slides.length;
+      const isInTransZone = hasNext && tType !== "none" && elapsed >= slideDuration - tDur;
+
+      if (isInTransZone && !inTransition) {
+        inTransition = true;
+        transStartTime = Date.now();
+      }
+
+      // Render to main canvas via transition compositing
+      const mainCanvas = canvasRef.current;
+      if (mainCanvas && script) {
+        const previewScale = 0.3;
+        mainCanvas.width = ratio.width * previewScale;
+        mainCanvas.height = ratio.height * previewScale;
+        const mainCtx = mainCanvas.getContext("2d");
+        if (mainCtx) {
+          if (inTransition && hasNext) {
+            // Render outgoing slide
+            outCanvas.width = ratio.width;
+            outCanvas.height = ratio.height;
+            const outCtx = outCanvas.getContext("2d")!;
+            renderSlideToCanvas(outCanvas, script.slides[slideIndex], slideIndex, phase, 1, progress, script.gradient, null, 0, false, waveformStyle, textStyle);
+
+            // Render incoming slide
+            inCanvas.width = ratio.width;
+            inCanvas.height = ratio.height;
+            renderSlideToCanvas(inCanvas, script.slides[nextIndex], nextIndex, phase, 1, 0, script.gradient, null, 0, false, waveformStyle, textStyle);
+
+            // Composite
+            const tProgress = Math.min((Date.now() - transStartTime) / (tDur * 1000), 1);
+            mainCtx.save();
+            mainCtx.scale(previewScale, previewScale);
+            const virtualCanvas = { width: ratio.width, height: ratio.height } as HTMLCanvasElement;
+            Object.defineProperty(mainCtx, "canvas", { value: virtualCanvas, configurable: true });
+            compositeTransition(mainCtx, outCanvas, inCanvas, tProgress, tType);
+            mainCtx.restore();
+          } else {
+            mainCtx.save();
+            mainCtx.scale(previewScale, previewScale);
+            const virtualCanvas = { width: ratio.width, height: ratio.height } as HTMLCanvasElement;
+            Object.defineProperty(mainCtx, "canvas", { value: virtualCanvas, configurable: true });
+            const slide = script.slides[slideIndex];
+            const bg = getSlideBg(slide, script.gradient);
+            drawFrame(
+              mainCtx, slide, phase, opacity,
+              showWaveform ? (waveformData || null) : null, progress, showWaveform, waveformStyle,
+              bg.type === "image" ? slideBgImagesRef.current.get(slideIndex) || null : null,
+              bg.type === "video" ? slideBgVideosRef.current.get(slideIndex) || null : null,
+              textStyle, bg.gradient,
+            );
+            mainCtx.restore();
+          }
+        }
+      }
+
       if (elapsed >= slideDuration) {
         const next = slideIndex + 1;
         if (next >= script.slides.length) {
@@ -675,6 +745,7 @@ export default function VideoCreator() {
         slideIndex = next;
         setCurrentSlide(next);
         slideStartTime = Date.now();
+        inTransition = false;
         playSlideAudio(next);
       }
 
@@ -690,7 +761,7 @@ export default function VideoCreator() {
       if (audioCtx) { audioCtx.close().catch(() => {}); playbackAudioCtxRef.current = null; analyserRef.current = null; }
       setWaveformData(null);
     };
-  }, [isPlaying, getSlideDuration, showWaveform, bgMusicUrl, bgMusicVolume]);
+  }, [isPlaying, getSlideDuration, showWaveform, bgMusicUrl, bgMusicVolume, transitionType, transitionDuration, ratio, drawFrame, compositeTransition, renderSlideToCanvas, getSlideBg, textStyle, waveformStyle]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────
 
