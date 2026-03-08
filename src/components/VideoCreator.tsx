@@ -646,14 +646,48 @@ export default function VideoCreator() {
 
     playSlideAudio(slideIndex);
 
-    // Start background music
+    // Start background music with trim, loop, and fade
     let bgMusicEl: HTMLAudioElement | null = null;
+    let bgFadeInterval: ReturnType<typeof setInterval> | null = null;
+    const playbackStartTime = Date.now();
+    // Calculate total video duration for fade-out timing
+    let totalVideoDuration = 0;
+    for (let i = 0; i < script.slides.length; i++) totalVideoDuration += getSlideDuration(i);
+
     if (bgMusicUrl) {
       bgMusicEl = new Audio(bgMusicUrl);
-      bgMusicEl.loop = true;
-      bgMusicEl.volume = bgMusicVolume;
+      bgMusicEl.currentTime = bgMusicTrimStart;
+      bgMusicEl.volume = bgMusicFadeIn > 0 ? 0 : bgMusicVolume; // Start at 0 if fade-in
       bgMusicAudioRef.current = bgMusicEl;
+
+      // Handle trim end & looping
+      const trimEnd = bgMusicTrimEnd > bgMusicTrimStart ? bgMusicTrimEnd : bgMusicDuration;
+      const onTimeUpdate = () => {
+        if (bgMusicEl && bgMusicEl.currentTime >= trimEnd) {
+          if (bgMusicLoop) {
+            bgMusicEl.currentTime = bgMusicTrimStart;
+          } else {
+            bgMusicEl.pause();
+          }
+        }
+      };
+      bgMusicEl.addEventListener("timeupdate", onTimeUpdate);
       bgMusicEl.play().catch(() => {});
+
+      // Fade-in/fade-out volume automation
+      bgFadeInterval = setInterval(() => {
+        if (!bgMusicEl) return;
+        const elapsed = (Date.now() - playbackStartTime) / 1000;
+        const remaining = totalVideoDuration - elapsed;
+        let vol = bgMusicVolume;
+        if (bgMusicFadeIn > 0 && elapsed < bgMusicFadeIn) {
+          vol *= elapsed / bgMusicFadeIn;
+        }
+        if (bgMusicFadeOut > 0 && remaining < bgMusicFadeOut) {
+          vol *= Math.max(0, remaining / bgMusicFadeOut);
+        }
+        bgMusicEl.volume = Math.max(0, Math.min(1, vol));
+      }, 50);
     }
 
     const tType = transitionType;
