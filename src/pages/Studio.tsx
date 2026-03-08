@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save, Facebook, ChevronDown, Settings2, Film } from "lucide-react";
+import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save, Facebook, ChevronDown, Settings2, Film, Type } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,7 @@ import { streamGenerate } from "@/lib/streamChat";
 import TranslateTab from "@/components/TranslateTab";
 import PublishPanel from "@/components/PublishPanel";
 import VideoCreator from "@/components/VideoCreator";
+import WordHighlightCreator from "@/components/WordHighlightCreator";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Brand = Tables<"brands">;
@@ -736,7 +737,24 @@ export default function Studio() {
         </TabsContent>
 
         <TabsContent value="video">
-          <VideoCreator />
+          <Tabs defaultValue="slides" className="space-y-4">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="slides" className="gap-2">
+                <Film className="h-4 w-4" />
+                <span>Slides</span>
+              </TabsTrigger>
+              <TabsTrigger value="word-highlight" className="gap-2">
+                <Type className="h-4 w-4" />
+                <span>Word Highlight</span>
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="slides">
+              <VideoCreator />
+            </TabsContent>
+            <TabsContent value="word-highlight">
+              <WordHighlightCreator />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="audio">
