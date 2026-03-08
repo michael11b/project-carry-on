@@ -98,7 +98,8 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
 
   useEffect(() => { fetchPages(); }, [fetchPages]);
 
-  const postType = mediaUrl ? "image" : "text";
+  const isVideo = mediaUrl?.includes(".webm") || mediaUrl?.includes(".mp4");
+  const postType = mediaUrl ? (isVideo ? "video" : "image") : "text";
 
   const handlePublish = async () => {
     if (!orgId || publishing) return;

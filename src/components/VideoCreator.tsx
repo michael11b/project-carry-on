@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import PublishPanel from "@/components/PublishPanel";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -175,7 +176,7 @@ export default function VideoCreator() {
   // Recording state
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
-
+  const [exportedVideoUrl, setExportedVideoUrl] = useState<string | null>(null);
   // Background music state
   const [bgMusicBlob, setBgMusicBlob] = useState<Blob | null>(null);
   const [bgMusicUrl, setBgMusicUrl] = useState<string | null>(null);
@@ -900,16 +901,31 @@ export default function VideoCreator() {
       });
       recordedChunks.current = [];
       mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.current.push(e.data); };
-      mediaRecorder.onstop = () => {
+      mediaRecorder.onstop = async () => {
         const blob = new Blob(recordedChunks.current, { type: "video/webm" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = `${script.title || "video"}-${Date.now()}.webm`;
         a.click();
+
+        // Upload to storage for publishing
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          const { data: memberships } = await supabase.from("organization_members").select("org_id").eq("user_id", user!.id);
+          if (memberships?.length) {
+            const filePath = `${memberships[0].org_id}/${crypto.randomUUID()}.webm`;
+            const { error: uploadErr } = await supabase.storage.from("post-media").upload(filePath, blob, { contentType: "video/webm", upsert: false });
+            if (!uploadErr) {
+              const { data: urlData } = supabase.storage.from("post-media").getPublicUrl(filePath);
+              setExportedVideoUrl(urlData.publicUrl);
+            }
+          }
+        } catch {}
+
         URL.revokeObjectURL(url);
         setIsRecording(false);
-        toast({ title: "Video exported!" });
+        toast({ title: "Video exported!", description: "Ready to publish to social media." });
       };
       mediaRecorder.start();
 
@@ -1800,6 +1816,18 @@ export default function VideoCreator() {
           )}
         </CardContent>
       </Card>
+
+      {/* Publish Panel */}
+      {exportedVideoUrl && (
+        <div className="lg:col-span-2">
+          <PublishPanel
+            content={script?.title || prompt || "Video post"}
+            mediaUrl={exportedVideoUrl}
+            defaultTitle={script?.title || prompt?.slice(0, 80)}
+            hasContent={!!exportedVideoUrl}
+          />
+        </div>
+      )}
     </div>
   );
 }
