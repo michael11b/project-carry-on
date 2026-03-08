@@ -376,10 +376,6 @@ export default function VideoCreator() {
       ctx.globalAlpha = 1;
       ctx.shadowColor = "transparent";
       ctx.shadowBlur = 0;
-      // Skip the normal draw below
-      // Jump to waveform section
-      goto_waveform();
-      return_early();
     }
 
     // Apply scale transform if needed
