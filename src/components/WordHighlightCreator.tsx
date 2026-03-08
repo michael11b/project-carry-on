@@ -840,9 +840,9 @@ export default function WordHighlightCreator() {
                   >
                     {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                   </Button>
-                  <span className="text-xs text-muted-foreground">
-                    {isPlaying ? `${playbackTime.toFixed(1)}s / ${audioDuration.toFixed(1)}s` : "Ready to play"}
-                  </span>
+                   <span ref={timeDisplayRef} className="text-xs text-muted-foreground">
+                     {isPlaying ? `0.0s / ${audioDuration.toFixed(1)}s` : "Ready to play"}
+                   </span>
                   {!isPlaying && playbackTime > 0 && (
                     <Button variant="ghost" size="sm" onClick={() => setPlaybackTime(0)} className="gap-1 text-xs">
                       <RotateCcw className="h-3 w-3" /> Reset
