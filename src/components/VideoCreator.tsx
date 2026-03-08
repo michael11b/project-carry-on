@@ -225,54 +225,118 @@ export default function VideoCreator() {
 
     // Waveform visualizer
     if (renderWaveform && waveform && waveform.length > 0) {
-      const barCount = 40;
-      const barWidth = (width * 0.6) / barCount;
-      const barGap = barWidth * 0.3;
-      const waveformY = height * 0.78;
-      const maxBarHeight = height * 0.08;
-      const waveformStartX = width * 0.2;
-
       ctx.globalAlpha = 0.85;
+      const waveStyle = (ctx.canvas as any)._waveformStyle || "bars";
 
-      for (let i = 0; i < barCount; i++) {
-        // Sample from the waveform data
-        const dataIndex = Math.floor((i / barCount) * waveform.length);
-        // Normalize: waveform values are typically -1 to 1 or 0-255 depending on type
-        const value = Math.abs(waveform[dataIndex] || 0);
-        const normalizedValue = Math.min(value / 128, 1); // For byte frequency data (0-255)
-        const barHeight = Math.max(2, normalizedValue * maxBarHeight);
+      if (waveStyle === "bars") {
+        const barCount = 40;
+        const barWidth = (width * 0.6) / barCount;
+        const barGap = barWidth * 0.3;
+        const waveformY = height * 0.78;
+        const maxBarHeight = height * 0.08;
+        const waveformStartX = width * 0.2;
 
-        const x = waveformStartX + i * (barWidth + barGap);
+        for (let i = 0; i < barCount; i++) {
+          const dataIndex = Math.floor((i / barCount) * waveform.length);
+          const value = Math.abs(waveform[dataIndex] || 0);
+          const normalizedValue = Math.min(value / 128, 1);
+          const barHeight = Math.max(2, normalizedValue * maxBarHeight);
+          const x = waveformStartX + i * (barWidth + barGap);
+          const barProgress = i / barCount;
+          ctx.fillStyle = barProgress <= (progress || 0) ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.3)";
+          const radius = Math.min(barWidth / 2, 3);
+          const bx = x, by = waveformY - barHeight / 2, bw = barWidth, bh = barHeight;
+          ctx.beginPath();
+          ctx.moveTo(bx + radius, by);
+          ctx.lineTo(bx + bw - radius, by);
+          ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + radius);
+          ctx.lineTo(bx + bw, by + bh - radius);
+          ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - radius, by + bh);
+          ctx.lineTo(bx + radius, by + bh);
+          ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - radius);
+          ctx.lineTo(bx, by + radius);
+          ctx.quadraticCurveTo(bx, by, bx + radius, by);
+          ctx.closePath();
+          ctx.fill();
+        }
+      } else if (waveStyle === "circular") {
+        const cx = width / 2;
+        const cy = height * 0.78;
+        const baseRadius = Math.min(width, height) * 0.06;
+        const maxExtension = Math.min(width, height) * 0.04;
+        const segmentCount = 48;
 
-        // Color: bars before progress are brighter, after are dimmer
-        const progressX = (progress || 0);
-        const barProgress = i / barCount;
-        
-        if (barProgress <= progressX) {
-          ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-        } else {
-          ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+        for (let i = 0; i < segmentCount; i++) {
+          const angle = (i / segmentCount) * Math.PI * 2 - Math.PI / 2;
+          const dataIndex = Math.floor((i / segmentCount) * waveform.length);
+          const value = Math.abs(waveform[dataIndex] || 0);
+          const normalizedValue = Math.min(value / 128, 1);
+          const ext = normalizedValue * maxExtension;
+          const segProgress = i / segmentCount;
+          ctx.strokeStyle = segProgress <= (progress || 0) ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.3)";
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(angle) * baseRadius, cy + Math.sin(angle) * baseRadius);
+          ctx.lineTo(cx + Math.cos(angle) * (baseRadius + ext), cy + Math.sin(angle) * (baseRadius + ext));
+          ctx.stroke();
         }
 
-        // Rounded bars
-        const radius = Math.min(barWidth / 2, 3);
-        const bx = x;
-        const by = waveformY - barHeight / 2;
-        const bw = barWidth;
-        const bh = barHeight;
-        
+        // Inner circle
         ctx.beginPath();
-        ctx.moveTo(bx + radius, by);
-        ctx.lineTo(bx + bw - radius, by);
-        ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + radius);
-        ctx.lineTo(bx + bw, by + bh - radius);
-        ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - radius, by + bh);
-        ctx.lineTo(bx + radius, by + bh);
-        ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - radius);
-        ctx.lineTo(bx, by + radius);
-        ctx.quadraticCurveTo(bx, by, bx + radius, by);
-        ctx.closePath();
-        ctx.fill();
+        ctx.arc(cx, cy, baseRadius * 0.85, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else if (waveStyle === "line") {
+        const waveformY = height * 0.78;
+        const waveStartX = width * 0.15;
+        const waveEndX = width * 0.85;
+        const waveWidth = waveEndX - waveStartX;
+        const maxAmplitude = height * 0.04;
+        const pointCount = 60;
+
+        // Played portion
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        const progressEnd = Math.floor(pointCount * (progress || 0));
+
+        for (let i = 0; i <= progressEnd; i++) {
+          const x = waveStartX + (i / pointCount) * waveWidth;
+          const dataIndex = Math.floor((i / pointCount) * waveform.length);
+          const value = Math.abs(waveform[dataIndex] || 0);
+          const normalizedValue = Math.min(value / 128, 1);
+          const y = waveformY + (normalizedValue * maxAmplitude * (i % 2 === 0 ? -1 : 1));
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Unplayed portion
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+        for (let i = progressEnd; i <= pointCount; i++) {
+          const x = waveStartX + (i / pointCount) * waveWidth;
+          const dataIndex = Math.floor((i / pointCount) * waveform.length);
+          const value = Math.abs(waveform[dataIndex] || 0);
+          const normalizedValue = Math.min(value / 128, 1);
+          const y = waveformY + (normalizedValue * maxAmplitude * (i % 2 === 0 ? -1 : 1));
+          if (i === progressEnd) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Progress dot
+        if (progress && progress > 0) {
+          const dotX = waveStartX + (progress) * waveWidth;
+          const dotDataIndex = Math.floor(progress * waveform.length);
+          const dotValue = Math.abs(waveform[Math.min(dotDataIndex, waveform.length - 1)] || 0);
+          const dotY = waveformY + (Math.min(dotValue / 128, 1) * maxAmplitude * (Math.floor(progress * pointCount) % 2 === 0 ? -1 : 1));
+          ctx.beginPath();
+          ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+          ctx.fill();
+        }
       }
 
       ctx.globalAlpha = 1;
