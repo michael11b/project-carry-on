@@ -22,7 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Loader2, Pencil, Trash2, Eye, Image, FileText, Video, ExternalLink, Search, Filter,
+  Loader2, Pencil, Trash2, Eye, Image, FileText, Video, ExternalLink, Search, Filter, RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 
