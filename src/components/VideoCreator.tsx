@@ -870,7 +870,66 @@ export default function VideoCreator() {
     setBgLoadTick((t) => t + 1);
   };
 
-  // ─── Preview dimensions ────────────────────────────────────────────────
+  /** Generate background music from a preset */
+  const handleGenerateMusic = async (preset: typeof MUSIC_PRESETS[0]) => {
+    if (!script) return;
+    setIsGeneratingMusic(true);
+    try {
+      // Calculate total duration
+      let totalDur = 0;
+      for (let i = 0; i < script.slides.length; i++) totalDur += getSlideDuration(i);
+      totalDur = Math.min(Math.ceil(totalDur), 120); // Cap at 120s
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ prompt: preset.prompt, duration: totalDur }),
+        }
+      );
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: "Music generation failed" }));
+        throw new Error(err.error || "Music generation failed");
+      }
+      const blob = await response.blob();
+      if (bgMusicUrl) URL.revokeObjectURL(bgMusicUrl);
+      const url = URL.createObjectURL(blob);
+      setBgMusicBlob(blob);
+      setBgMusicUrl(url);
+      setBgMusicName(preset.label);
+      toast({ title: "Music generated!", description: `${preset.label} track ready.` });
+    } catch (e) {
+      toast({ title: "Music generation failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setIsGeneratingMusic(false);
+    }
+  };
+
+  /** Upload custom music file */
+  const handleMusicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (bgMusicUrl) URL.revokeObjectURL(bgMusicUrl);
+    const url = URL.createObjectURL(file);
+    setBgMusicBlob(file);
+    setBgMusicUrl(url);
+    setBgMusicName(file.name);
+    if (bgMusicFileInputRef.current) bgMusicFileInputRef.current.value = "";
+  };
+
+  /** Remove background music */
+  const handleRemoveMusic = () => {
+    if (bgMusicUrl) URL.revokeObjectURL(bgMusicUrl);
+    if (bgMusicAudioRef.current) { bgMusicAudioRef.current.pause(); bgMusicAudioRef.current = null; }
+    setBgMusicBlob(null);
+    setBgMusicUrl(null);
+    setBgMusicName("");
+  };
 
   const previewMaxHeight = 480;
   const previewWidth = (ratio.width / ratio.height) * previewMaxHeight;
