@@ -753,6 +753,18 @@ export default function VideoCreator() {
                 </Select>
               </div>
 
+              {/* Waveform toggle */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AudioWaveform className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-xs">Waveform Visualizer</Label>
+                </div>
+                <Switch
+                  checked={showWaveform}
+                  onCheckedChange={setShowWaveform}
+                />
+              </div>
+
               {/* Actions */}
               <div className="flex flex-col gap-2">
                 <Button
