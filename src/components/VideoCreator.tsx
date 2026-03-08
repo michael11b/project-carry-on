@@ -600,8 +600,10 @@ export default function VideoCreator() {
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant="secondary" className="text-[10px]">Slide {i + 1}</Badge>
-                      <span className="text-[10px] text-muted-foreground">{slide.duration}s</span>
-                      {audioBlobs.has(i) && <Volume2 className="h-3 w-3 text-green-500" />}
+                      <span className="text-[10px] text-muted-foreground">
+                        {audioDurations.has(i) ? `${getSlideDuration(i).toFixed(1)}s (audio: ${audioDurations.get(i)!.toFixed(1)}s)` : `${slide.duration}s`}
+                      </span>
+                      {audioBlobs.has(i) && <Volume2 className="h-3 w-3 text-green-600" />}
                     </div>
                     <Input
                       value={slide.text}
