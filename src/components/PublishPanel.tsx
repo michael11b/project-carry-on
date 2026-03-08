@@ -150,7 +150,7 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
           org_id: orgId,
           created_by: user.id,
           title: postTitle,
-          content,
+          content: caption.trim() || postTitle,
           channel,
           status: "scheduled" as const,
           scheduled_at: scheduledAt.toISOString(),
