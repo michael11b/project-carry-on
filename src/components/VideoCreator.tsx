@@ -11,7 +11,7 @@ import {
 import {
   Sparkles, Loader2, Play, Pause, Download, Film,
   ChevronLeft, ChevronRight, RotateCcw, Volume2, AudioWaveform,
-  ImagePlus, VideoIcon, X, Type,
+  ImagePlus, VideoIcon, X, Type, Music, Upload, Trash2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
