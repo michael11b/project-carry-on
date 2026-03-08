@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Facebook, Save, Loader2, Settings2, Plus, X, FileText } from "lucide-react";
+import { Facebook, Save, Loader2, Settings2, Plus, X, FileText, LayoutList } from "lucide-react";
+import PostsManager from "@/components/PostsManager";
 
 interface FacebookPage {
   id: string;
@@ -65,7 +66,6 @@ export default function PagesConfig() {
   const [saving, setSaving] = useState(false);
   const [topicInput, setTopicInput] = useState("");
 
-  // Fetch org, pages, and existing profiles
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -80,7 +80,6 @@ export default function PagesConfig() {
       const oid = memberships[0].org_id;
       setOrgId(oid);
 
-      // Fetch connected FB pages
       const { data: pagesData } = await supabase.functions.invoke("facebook-pages", {
         body: { org_id: oid },
       });
@@ -88,7 +87,6 @@ export default function PagesConfig() {
       const pages: FacebookPage[] = pagesData?.pages || [];
       setFbPages(pages);
 
-      // Fetch existing profiles
       const { data: existingProfiles } = await supabase
         .from("page_profiles")
         .select("*")
@@ -128,11 +126,10 @@ export default function PagesConfig() {
 
   const updateField = useCallback((field: keyof PageProfile, value: any) => {
     if (!selectedPageId) return;
-    setProfiles((prev) => {
-      const updated = { ...prev[selectedPageId], [field]: value };
-      // Auto-regenerate system prompt when fields change (unless user edited it manually)
-      return { ...prev, [selectedPageId]: updated };
-    });
+    setProfiles((prev) => ({
+      ...prev,
+      [selectedPageId]: { ...prev[selectedPageId], [field]: value },
+    }));
   }, [selectedPageId]);
 
   const regeneratePrompt = useCallback(() => {
@@ -165,7 +162,6 @@ export default function PagesConfig() {
     setSaving(true);
     try {
       if (currentProfile.id) {
-        // Update
         const { error } = await supabase
           .from("page_profiles")
           .update({
@@ -182,7 +178,6 @@ export default function PagesConfig() {
           .eq("id", currentProfile.id);
         if (error) throw error;
       } else {
-        // Insert
         const { data, error } = await supabase
           .from("page_profiles")
           .insert({
@@ -226,195 +221,215 @@ export default function PagesConfig() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-display font-bold tracking-tight">Pages</h1>
+        <h1 className="text-3xl font-display font-bold tracking-tight">Pages & Posts</h1>
         <p className="text-muted-foreground mt-1">
-          Configure your connected Facebook pages with descriptions, tone, and AI generation context.
+          Manage your connected pages, configure AI profiles, and view all your posts.
         </p>
       </motion.div>
 
-      {fbPages.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <Facebook className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-            <h3 className="text-lg font-semibold mb-2">No Pages Connected</h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Connect your Facebook account in Settings → Integrations to see your pages here.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-          {/* Page List */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                Connected Pages
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-2">
-              <div className="space-y-1">
-                {fbPages.map((page) => {
-                  const hasProfile = !!profiles[page.id]?.id;
-                  return (
-                    <button
-                      key={page.id}
-                      onClick={() => setSelectedPageId(page.id)}
-                      className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
-                        selectedPageId === page.id
-                          ? "bg-primary/10 text-primary font-medium"
-                          : "hover:bg-muted/50"
-                      }`}
-                    >
-                      <Facebook className="h-4 w-4 shrink-0" />
-                      <span className="truncate flex-1">{page.name}</span>
-                      {hasProfile && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                          Configured
-                        </Badge>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+      <Tabs defaultValue="posts" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="posts" className="gap-2">
+            <LayoutList className="h-4 w-4" />
+            Posts
+          </TabsTrigger>
+          <TabsTrigger value="pages" className="gap-2">
+            <Settings2 className="h-4 w-4" />
+            Page Profiles
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Profile Editor */}
-          {currentProfile && (
+        {/* Posts Tab */}
+        <TabsContent value="posts">
+          {orgId ? (
+            <PostsManager orgId={orgId} />
+          ) : (
             <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Settings2 className="h-5 w-5" />
-                      {currentProfile.page_name}
-                    </CardTitle>
-                    <CardDescription className="mt-1">
-                      Set up the context and personality for AI-generated content on this page.
-                    </CardDescription>
-                  </div>
-                  <Button onClick={handleSave} disabled={saving} className="gap-2">
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Save
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label>Page Description</Label>
-                  <Textarea
-                    placeholder="e.g. This page shares daily cryptocurrency trading signals, market analysis, and investment tips for beginner to intermediate traders."
-                    value={currentProfile.description}
-                    onChange={(e) => updateField("description", e.target.value)}
-                    className="min-h-[80px]"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    What is this page about? This helps AI understand the context.
-                  </p>
-                </div>
-
-                {/* Target Audience */}
-                <div className="space-y-2">
-                  <Label>Target Audience</Label>
-                  <Input
-                    placeholder="e.g. Young crypto enthusiasts aged 18-35 interested in day trading"
-                    value={currentProfile.target_audience}
-                    onChange={(e) => updateField("target_audience", e.target.value)}
-                  />
-                </div>
-
-                {/* Content Tone */}
-                <div className="space-y-2">
-                  <Label>Content Tone</Label>
-                  <Select value={currentProfile.content_tone} onValueChange={(v) => updateField("content_tone", v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TONE_OPTIONS.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Content Topics */}
-                <div className="space-y-2">
-                  <Label>Content Topics</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add a topic..."
-                      value={topicInput}
-                      onChange={(e) => setTopicInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTopic())}
-                    />
-                    <Button variant="outline" size="icon" onClick={addTopic}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {currentProfile.content_topics.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {currentProfile.content_topics.map((topic) => (
-                        <Badge key={topic} variant="secondary" className="gap-1 pr-1">
-                          {topic}
-                          <button onClick={() => removeTopic(topic)} className="ml-1 hover:text-destructive">
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Posting Goals */}
-                <div className="space-y-2">
-                  <Label>Posting Goals</Label>
-                  <Input
-                    placeholder="e.g. Drive engagement, build community trust, increase sign-ups"
-                    value={currentProfile.posting_goals}
-                    onChange={(e) => updateField("posting_goals", e.target.value)}
-                  />
-                </div>
-
-                {/* Hashtag Preferences */}
-                <div className="space-y-2">
-                  <Label>Hashtag Preferences</Label>
-                  <Input
-                    placeholder="e.g. #CryptoSignals #Bitcoin #DayTrading #HODL"
-                    value={currentProfile.hashtag_preferences}
-                    onChange={(e) => updateField("hashtag_preferences", e.target.value)}
-                  />
-                </div>
-
-                <Separator />
-
-                {/* System Prompt */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      AI System Prompt
-                    </Label>
-                    <Button variant="ghost" size="sm" onClick={regeneratePrompt} className="text-xs">
-                      Regenerate from fields
-                    </Button>
-                  </div>
-                  <Textarea
-                    placeholder="The system prompt sent to AI when generating content for this page..."
-                    value={currentProfile.system_prompt}
-                    onChange={(e) => updateField("system_prompt", e.target.value)}
-                    className="min-h-[160px] font-mono text-xs"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    This prompt is injected into every AI generation when this page is selected. You can edit it freely or regenerate from the fields above.
-                  </p>
-                </div>
+              <CardContent className="p-12 text-center text-muted-foreground">
+                No organization found.
               </CardContent>
             </Card>
           )}
-        </div>
-      )}
+        </TabsContent>
+
+        {/* Page Profiles Tab */}
+        <TabsContent value="pages">
+          {fbPages.length === 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Facebook className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                <h3 className="text-lg font-semibold mb-2">No Pages Connected</h3>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  Connect your Facebook account in Settings → Integrations to see your pages here.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+              {/* Page List */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                    Connected Pages
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-2">
+                  <div className="space-y-1">
+                    {fbPages.map((page) => {
+                      const hasProfile = !!profiles[page.id]?.id;
+                      return (
+                        <button
+                          key={page.id}
+                          onClick={() => setSelectedPageId(page.id)}
+                          className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                            selectedPageId === page.id
+                              ? "bg-primary/10 text-primary font-medium"
+                              : "hover:bg-muted/50"
+                          }`}
+                        >
+                          <Facebook className="h-4 w-4 shrink-0" />
+                          <span className="truncate flex-1">{page.name}</span>
+                          {hasProfile && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                              Configured
+                            </Badge>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Profile Editor */}
+              {currentProfile && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Settings2 className="h-5 w-5" />
+                          {currentProfile.page_name}
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                          Set up the context and personality for AI-generated content on this page.
+                        </CardDescription>
+                      </div>
+                      <Button onClick={handleSave} disabled={saving} className="gap-2">
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Save
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                      <Label>Page Description</Label>
+                      <Textarea
+                        placeholder="e.g. This page shares daily cryptocurrency trading signals..."
+                        value={currentProfile.description}
+                        onChange={(e) => updateField("description", e.target.value)}
+                        className="min-h-[80px]"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        What is this page about? This helps AI understand the context.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Target Audience</Label>
+                      <Input
+                        placeholder="e.g. Young crypto enthusiasts aged 18-35"
+                        value={currentProfile.target_audience}
+                        onChange={(e) => updateField("target_audience", e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Content Tone</Label>
+                      <Select value={currentProfile.content_tone} onValueChange={(v) => updateField("content_tone", v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {TONE_OPTIONS.map((t) => (
+                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Content Topics</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Add a topic..."
+                          value={topicInput}
+                          onChange={(e) => setTopicInput(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTopic())}
+                        />
+                        <Button variant="outline" size="icon" onClick={addTopic}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {currentProfile.content_topics.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {currentProfile.content_topics.map((topic) => (
+                            <Badge key={topic} variant="secondary" className="gap-1 pr-1">
+                              {topic}
+                              <button onClick={() => removeTopic(topic)} className="ml-1 hover:text-destructive">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Posting Goals</Label>
+                      <Input
+                        placeholder="e.g. Drive engagement, build community trust"
+                        value={currentProfile.posting_goals}
+                        onChange={(e) => updateField("posting_goals", e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Hashtag Preferences</Label>
+                      <Input
+                        placeholder="e.g. #CryptoSignals #Bitcoin #DayTrading"
+                        value={currentProfile.hashtag_preferences}
+                        onChange={(e) => updateField("hashtag_preferences", e.target.value)}
+                      />
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          AI System Prompt
+                        </Label>
+                        <Button variant="ghost" size="sm" onClick={regeneratePrompt} className="text-xs">
+                          Regenerate from fields
+                        </Button>
+                      </div>
+                      <Textarea
+                        placeholder="The system prompt sent to AI when generating content for this page..."
+                        value={currentProfile.system_prompt}
+                        onChange={(e) => updateField("system_prompt", e.target.value)}
+                        className="min-h-[160px] font-mono text-xs"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        This prompt is injected into every AI generation when this page is selected.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
