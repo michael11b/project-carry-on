@@ -298,6 +298,13 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
+                          {post.published_fb_id && post.facebook_page_id && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild title="View on Facebook">
+                              <a href={`https://facebook.com/${post.published_fb_id}`} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          )}
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewPost(post)} title="View">
                             <Eye className="h-4 w-4" />
                           </Button>
