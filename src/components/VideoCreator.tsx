@@ -88,6 +88,35 @@ export default function VideoCreator() {
 
   const ratio = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[0];
 
+  // Measure actual duration of an audio blob
+  const getAudioBlobDuration = (blob: Blob): Promise<number> => {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.addEventListener("loadedmetadata", () => {
+        // Some browsers return Infinity for streaming audio, handle that
+        if (isFinite(audio.duration)) {
+          resolve(audio.duration);
+        } else {
+          // Fallback: listen for durationchange
+          audio.addEventListener("durationchange", () => {
+            if (isFinite(audio.duration)) {
+              resolve(audio.duration);
+              URL.revokeObjectURL(url);
+            }
+          });
+          // If still can't get it, use a reasonable default after timeout
+          setTimeout(() => resolve(3), 5000);
+        }
+        URL.revokeObjectURL(url);
+      });
+      audio.addEventListener("error", () => {
+        resolve(3); // fallback
+        URL.revokeObjectURL(url);
+      });
+    });
+  };
+
   // Get effective slide duration: use audio duration if available, otherwise fallback to script duration + padding
   const getSlideDuration = useCallback((slideIndex: number): number => {
     const audioDur = audioDurations.get(slideIndex);
