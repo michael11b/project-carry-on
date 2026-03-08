@@ -197,6 +197,7 @@ export default function VideoCreator() {
     waveStyle?: "bars" | "circular" | "line",
     bgImage?: HTMLImageElement | null,
     bgVideo?: HTMLVideoElement | null,
+    ts?: TextStyle,
   ) => {
     const { width, height } = ctx.canvas;
 
