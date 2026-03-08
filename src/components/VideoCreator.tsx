@@ -306,10 +306,70 @@ export default function VideoCreator() {
     let slideIndex = currentSlide;
     let phase = gradientPhase;
 
+    // Set up audio analyser for waveform visualization
+    let audioCtx: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let frequencyData: Uint8Array | null = null;
+
+    const setupAnalyser = () => {
+      if (!showWaveform) return;
+      try {
+        audioCtx = new AudioContext();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 128;
+        frequencyData = new Uint8Array(analyser.frequencyBinCount);
+        playbackAudioCtxRef.current = audioCtx;
+        analyserRef.current = analyser;
+      } catch { /* ignore */ }
+    };
+
+    setupAnalyser();
+
+    const playSlideAudio = (index: number) => {
+      const audioBlob = audioBlobs.get(index);
+      if (!audioBlob) return;
+
+      const url = URL.createObjectURL(audioBlob);
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      // Connect to analyser if waveform is enabled
+      if (showWaveform && audioCtx && analyser) {
+        try {
+          const source = audioCtx.createMediaElementSource(audio);
+          source.connect(analyser);
+          analyser.connect(audioCtx.destination);
+        } catch { /* already connected or error */ }
+      }
+
+      audio.play().catch(() => {});
+    };
+
+    // Play first slide audio
+    playSlideAudio(slideIndex);
+
     const animate = () => {
       const elapsed = (Date.now() - slideStartTime) / 1000;
       const slideDuration = getSlideDuration(slideIndex);
       phase += 1;
+
+      // Progress within slide
+      const progress = Math.min(elapsed / slideDuration, 1);
+      setPlaybackProgress(progress);
+
+      // Read frequency data for waveform
+      if (showWaveform && analyser && frequencyData) {
+        analyser.getByteFrequencyData(frequencyData);
+        // Convert to Float32Array for drawFrame
+        const floatData = new Float32Array(frequencyData.length);
+        for (let i = 0; i < frequencyData.length; i++) {
+          floatData[i] = frequencyData[i];
+        }
+        setWaveformData(floatData);
+      }
 
       // Text fade in/out
       let opacity = 1;
@@ -326,34 +386,18 @@ export default function VideoCreator() {
         if (nextIndex >= script.slides.length) {
           setIsPlaying(false);
           setCurrentSlide(0);
+          setWaveformData(null);
+          setPlaybackProgress(0);
           return;
         }
         slideIndex = nextIndex;
         setCurrentSlide(nextIndex);
         slideStartTime = Date.now();
-
-        // Play audio for next slide
-        const audioBlob = audioBlobs.get(nextIndex);
-        if (audioBlob) {
-          const url = URL.createObjectURL(audioBlob);
-          if (audioRef.current) {
-            audioRef.current.pause();
-          }
-          audioRef.current = new Audio(url);
-          audioRef.current.play().catch(() => {});
-        }
+        playSlideAudio(nextIndex);
       }
 
       animationRef.current = requestAnimationFrame(animate);
     };
-
-    // Play first slide audio
-    const firstAudio = audioBlobs.get(slideIndex);
-    if (firstAudio) {
-      const url = URL.createObjectURL(firstAudio);
-      audioRef.current = new Audio(url);
-      audioRef.current.play().catch(() => {});
-    }
 
     animationRef.current = requestAnimationFrame(animate);
 
@@ -363,8 +407,14 @@ export default function VideoCreator() {
         audioRef.current.pause();
         audioRef.current = null;
       }
+      if (audioCtx) {
+        audioCtx.close().catch(() => {});
+        playbackAudioCtxRef.current = null;
+        analyserRef.current = null;
+      }
+      setWaveformData(null);
     };
-  }, [isPlaying, getSlideDuration]);
+  }, [isPlaying, getSlideDuration, showWaveform]);
 
   const handleGenerateScript = async () => {
     if (!prompt.trim()) {
