@@ -893,11 +893,21 @@ export default function VideoCreator() {
       slideBgVideosRef.current.forEach((v) => { v.currentTime = 0; v.play().catch(() => {}); });
 
       let phase = 0;
+      const expOutCanvas = document.createElement("canvas");
+      const expInCanvas = document.createElement("canvas");
+      expOutCanvas.width = ratio.width;
+      expOutCanvas.height = ratio.height;
+      expInCanvas.width = ratio.width;
+      expInCanvas.height = ratio.height;
+      const tType = transitionType;
+      const tDur = transitionDuration;
+
       for (let s = 0; s < script.slides.length; s++) {
         const slide = script.slides[s];
         const durationMs = getSlideDuration(s) * 1000;
         const startTime = Date.now();
         const bg = getSlideBg(slide, script.gradient);
+        const hasNext = s + 1 < script.slides.length;
 
         const audioBlob = audioBlobs.get(s);
         if (audioBlob) {
@@ -920,13 +930,25 @@ export default function VideoCreator() {
           else if (elapsed > durSec - 0.3) opacity = Math.max(0, (durSec - elapsed) / 0.3);
           const exportProgress = elapsed / durSec;
           const exportWaveform = showWaveform ? new Float32Array(64).map(() => Math.random() * 180 + 20) : null;
-          drawFrame(
-            offCtx, slide, phase, opacity, exportWaveform, exportProgress,
-            showWaveform, waveformStyle,
-            bg.type === "image" ? slideBgImagesRef.current.get(s) || null : null,
-            bg.type === "video" ? slideBgVideosRef.current.get(s) || null : null,
-            textStyle, bg.gradient,
-          );
+
+          // Check transition zone
+          const inTransZone = hasNext && tType !== "none" && elapsed >= durSec - tDur;
+
+          if (inTransZone) {
+            // Render both slides to offscreen canvases
+            renderSlideToCanvas(expOutCanvas, slide, s, phase, 1, exportProgress, script.gradient, exportWaveform, exportProgress, showWaveform, waveformStyle, textStyle);
+            renderSlideToCanvas(expInCanvas, script.slides[s + 1], s + 1, phase, 1, 0, script.gradient, null, 0, false, waveformStyle, textStyle);
+            const tProgress = Math.min((elapsed - (durSec - tDur)) / tDur, 1);
+            compositeTransition(offCtx, expOutCanvas, expInCanvas, tProgress, tType);
+          } else {
+            drawFrame(
+              offCtx, slide, phase, opacity, exportWaveform, exportProgress,
+              showWaveform, waveformStyle,
+              bg.type === "image" ? slideBgImagesRef.current.get(s) || null : null,
+              bg.type === "video" ? slideBgVideosRef.current.get(s) || null : null,
+              textStyle, bg.gradient,
+            );
+          }
           await new Promise(r => setTimeout(r, 33));
         }
       }
