@@ -260,7 +260,7 @@ export default function VideoCreator() {
           ctx.closePath();
           ctx.fill();
         }
-      } else if (effectiveStyle === "circular") {
+      } else if (effectifectiveStyle === "circular") {
         const cx = width / 2;
         const cy = height * 0.78;
         const baseRadius = Math.min(width, height) * 0.06;
@@ -288,7 +288,7 @@ export default function VideoCreator() {
         ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
         ctx.lineWidth = 1.5;
         ctx.stroke();
-      } else if (waveStyle === "line") {
+      } elseeffectif (waveStyle === "line") {
         const waveformY = height * 0.78;
         const waveStartX = width * 0.15;
         const waveEndX = width * 0.85;
