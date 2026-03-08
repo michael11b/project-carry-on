@@ -309,7 +309,7 @@ export default function VideoCreator() {
     // Set up audio analyser for waveform visualization
     let audioCtx: AudioContext | null = null;
     let analyser: AnalyserNode | null = null;
-    let frequencyData: Uint8Array | null = null;
+    let frequencyData: Uint8Array<ArrayBuffer> | null = null;
 
     const setupAnalyser = () => {
       if (!showWaveform) return;
