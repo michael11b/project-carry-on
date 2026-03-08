@@ -56,6 +56,37 @@ const GRADIENT_PRESETS = [
   "linear-gradient(135deg, #0c3483 0%, #a2b6df 100%)",
 ];
 
+const FONT_OPTIONS = [
+  { value: "system-ui, -apple-system, sans-serif", label: "System" },
+  { value: "'Georgia', serif", label: "Georgia" },
+  { value: "'Courier New', monospace", label: "Mono" },
+  { value: "'Impact', sans-serif", label: "Impact" },
+  { value: "'Trebuchet MS', sans-serif", label: "Trebuchet" },
+  { value: "'Comic Sans MS', cursive", label: "Comic" },
+];
+
+const TEXT_POSITIONS = [
+  { value: "center", label: "Center" },
+  { value: "top", label: "Top" },
+  { value: "bottom", label: "Bottom" },
+];
+
+const TEXT_ANIMATIONS = [
+  { value: "fade", label: "Fade" },
+  { value: "typewriter", label: "Typewriter" },
+  { value: "scale", label: "Scale Up" },
+  { value: "slide-up", label: "Slide Up" },
+];
+
+interface TextStyle {
+  font: string;
+  sizeMultiplier: number; // 0.5 to 1.5, default 1
+  position: "center" | "top" | "bottom";
+  animation: "fade" | "typewriter" | "scale" | "slide-up";
+  bold: boolean;
+  color: string;
+}
+
 export default function VideoCreator() {
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
