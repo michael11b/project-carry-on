@@ -184,6 +184,12 @@ export default function VideoCreator() {
   const [bgMusicName, setBgMusicName] = useState<string>("");
   const bgMusicAudioRef = useRef<HTMLAudioElement | null>(null);
   const bgMusicFileInputRef = useRef<HTMLInputElement>(null);
+  const [bgMusicDuration, setBgMusicDuration] = useState(0);
+  const [bgMusicTrimStart, setBgMusicTrimStart] = useState(0);
+  const [bgMusicTrimEnd, setBgMusicTrimEnd] = useState(0); // 0 means full duration
+  const [bgMusicLoop, setBgMusicLoop] = useState(true);
+  const [bgMusicFadeIn, setBgMusicFadeIn] = useState(1.5);
+  const [bgMusicFadeOut, setBgMusicFadeOut] = useState(2.0);
 
   // Transition state
   const [transitionType, setTransitionType] = useState<TransitionType>("crossfade");
@@ -640,14 +646,48 @@ export default function VideoCreator() {
 
     playSlideAudio(slideIndex);
 
-    // Start background music
+    // Start background music with trim, loop, and fade
     let bgMusicEl: HTMLAudioElement | null = null;
+    let bgFadeInterval: ReturnType<typeof setInterval> | null = null;
+    const playbackStartTime = Date.now();
+    // Calculate total video duration for fade-out timing
+    let totalVideoDuration = 0;
+    for (let i = 0; i < script.slides.length; i++) totalVideoDuration += getSlideDuration(i);
+
     if (bgMusicUrl) {
       bgMusicEl = new Audio(bgMusicUrl);
-      bgMusicEl.loop = true;
-      bgMusicEl.volume = bgMusicVolume;
+      bgMusicEl.currentTime = bgMusicTrimStart;
+      bgMusicEl.volume = bgMusicFadeIn > 0 ? 0 : bgMusicVolume; // Start at 0 if fade-in
       bgMusicAudioRef.current = bgMusicEl;
+
+      // Handle trim end & looping
+      const trimEnd = bgMusicTrimEnd > bgMusicTrimStart ? bgMusicTrimEnd : bgMusicDuration;
+      const onTimeUpdate = () => {
+        if (bgMusicEl && bgMusicEl.currentTime >= trimEnd) {
+          if (bgMusicLoop) {
+            bgMusicEl.currentTime = bgMusicTrimStart;
+          } else {
+            bgMusicEl.pause();
+          }
+        }
+      };
+      bgMusicEl.addEventListener("timeupdate", onTimeUpdate);
       bgMusicEl.play().catch(() => {});
+
+      // Fade-in/fade-out volume automation
+      bgFadeInterval = setInterval(() => {
+        if (!bgMusicEl) return;
+        const elapsed = (Date.now() - playbackStartTime) / 1000;
+        const remaining = totalVideoDuration - elapsed;
+        let vol = bgMusicVolume;
+        if (bgMusicFadeIn > 0 && elapsed < bgMusicFadeIn) {
+          vol *= elapsed / bgMusicFadeIn;
+        }
+        if (bgMusicFadeOut > 0 && remaining < bgMusicFadeOut) {
+          vol *= Math.max(0, remaining / bgMusicFadeOut);
+        }
+        bgMusicEl.volume = Math.max(0, Math.min(1, vol));
+      }, 50);
     }
 
     const tType = transitionType;
@@ -758,10 +798,11 @@ export default function VideoCreator() {
       cancelAnimationFrame(animationRef.current);
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
       if (bgMusicEl) { bgMusicEl.pause(); bgMusicAudioRef.current = null; }
+      if (bgFadeInterval) clearInterval(bgFadeInterval);
       if (audioCtx) { audioCtx.close().catch(() => {}); playbackAudioCtxRef.current = null; analyserRef.current = null; }
       setWaveformData(null);
     };
-  }, [isPlaying, getSlideDuration, showWaveform, bgMusicUrl, bgMusicVolume, transitionType, transitionDuration, ratio, drawFrame, compositeTransition, renderSlideToCanvas, getSlideBg, textStyle, waveformStyle]);
+  }, [isPlaying, getSlideDuration, showWaveform, bgMusicUrl, bgMusicVolume, bgMusicTrimStart, bgMusicTrimEnd, bgMusicDuration, bgMusicLoop, bgMusicFadeIn, bgMusicFadeOut, transitionType, transitionDuration, ratio, drawFrame, compositeTransition, renderSlideToCanvas, getSlideBg, textStyle, waveformStyle]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────
 
@@ -874,18 +915,40 @@ export default function VideoCreator() {
 
       // Mix background music into export
       let bgMusicSource: AudioBufferSourceNode | null = null;
+      let bgMusicGain: GainNode | null = null;
+      let totalExportDuration = 0;
+      for (let i = 0; i < script.slides.length; i++) totalExportDuration += getSlideDuration(i);
+
       if (bgMusicBlob) {
         try {
           const musicAb = await bgMusicBlob.arrayBuffer();
           const musicBuf = await audioContext.decodeAudioData(musicAb);
-          const gainNode = audioContext.createGain();
-          gainNode.gain.value = bgMusicVolume;
+          bgMusicGain = audioContext.createGain();
+          bgMusicGain.gain.setValueAtTime(bgMusicFadeIn > 0 ? 0 : bgMusicVolume, audioContext.currentTime);
+
+          // Fade-in
+          if (bgMusicFadeIn > 0) {
+            bgMusicGain.gain.linearRampToValueAtTime(bgMusicVolume, audioContext.currentTime + bgMusicFadeIn);
+          }
+          // Fade-out
+          if (bgMusicFadeOut > 0) {
+            const fadeOutStart = Math.max(0, totalExportDuration - bgMusicFadeOut);
+            bgMusicGain.gain.setValueAtTime(bgMusicVolume, audioContext.currentTime + fadeOutStart);
+            bgMusicGain.gain.linearRampToValueAtTime(0, audioContext.currentTime + totalExportDuration);
+          }
+
           bgMusicSource = audioContext.createBufferSource();
           bgMusicSource.buffer = musicBuf;
-          bgMusicSource.loop = true;
-          bgMusicSource.connect(gainNode);
-          gainNode.connect(destination);
-          bgMusicSource.start();
+          bgMusicSource.loop = bgMusicLoop;
+          // Set trim: loopStart/loopEnd control which region loops
+          const trimStart = bgMusicTrimStart;
+          const trimEnd = bgMusicTrimEnd > bgMusicTrimStart ? bgMusicTrimEnd : musicBuf.duration;
+          bgMusicSource.loopStart = trimStart;
+          bgMusicSource.loopEnd = trimEnd;
+          bgMusicSource.connect(bgMusicGain);
+          bgMusicGain.connect(destination);
+          // Start from trim start position
+          bgMusicSource.start(0, trimStart);
         } catch { /* ignore music decode errors */ }
       }
 
@@ -1107,9 +1170,13 @@ export default function VideoCreator() {
       const blob = await response.blob();
       if (bgMusicUrl) URL.revokeObjectURL(bgMusicUrl);
       const url = URL.createObjectURL(blob);
+      const dur = await getAudioBlobDuration(blob);
       setBgMusicBlob(blob);
       setBgMusicUrl(url);
       setBgMusicName(preset.label);
+      setBgMusicDuration(dur);
+      setBgMusicTrimStart(0);
+      setBgMusicTrimEnd(dur);
       toast({ title: "Music generated!", description: `${preset.label} track ready.` });
     } catch (e) {
       toast({ title: "Music generation failed", description: (e as Error).message, variant: "destructive" });
@@ -1127,6 +1194,11 @@ export default function VideoCreator() {
     setBgMusicBlob(file);
     setBgMusicUrl(url);
     setBgMusicName(file.name);
+    getAudioBlobDuration(file).then((dur) => {
+      setBgMusicDuration(dur);
+      setBgMusicTrimStart(0);
+      setBgMusicTrimEnd(dur);
+    });
     if (bgMusicFileInputRef.current) bgMusicFileInputRef.current.value = "";
   };
 
@@ -1137,7 +1209,13 @@ export default function VideoCreator() {
     setBgMusicBlob(null);
     setBgMusicUrl(null);
     setBgMusicName("");
+    setBgMusicDuration(0);
+    setBgMusicTrimStart(0);
+    setBgMusicTrimEnd(0);
   };
+
+  /** Effective trimmed duration of the music clip */
+  const bgMusicTrimmedDuration = bgMusicTrimEnd > bgMusicTrimStart ? bgMusicTrimEnd - bgMusicTrimStart : bgMusicDuration;
 
   const previewMaxHeight = 480;
   const previewWidth = (ratio.width / ratio.height) * previewMaxHeight;
@@ -1534,6 +1612,8 @@ export default function VideoCreator() {
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
+
+                    {/* Volume */}
                     <div className="space-y-1">
                       <Label className="text-[10px] text-muted-foreground">Volume ({Math.round(bgMusicVolume * 100)}%)</Label>
                       <Slider
@@ -1543,6 +1623,54 @@ export default function VideoCreator() {
                           setBgMusicVolume(v);
                           if (bgMusicAudioRef.current) bgMusicAudioRef.current.volume = v;
                         }}
+                        className="py-1"
+                      />
+                    </div>
+
+                    {/* Trim */}
+                    {bgMusicDuration > 0 && (
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">
+                          Trim ({bgMusicTrimStart.toFixed(1)}s – {(bgMusicTrimEnd || bgMusicDuration).toFixed(1)}s of {bgMusicDuration.toFixed(1)}s)
+                        </Label>
+                        <Slider
+                          value={[bgMusicTrimStart, bgMusicTrimEnd || bgMusicDuration]}
+                          min={0}
+                          max={bgMusicDuration}
+                          step={0.5}
+                          onValueChange={([s, e]) => {
+                            setBgMusicTrimStart(s);
+                            setBgMusicTrimEnd(e);
+                          }}
+                          className="py-1"
+                        />
+                      </div>
+                    )}
+
+                    {/* Loop toggle */}
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] text-muted-foreground">Loop music</Label>
+                      <Switch checked={bgMusicLoop} onCheckedChange={setBgMusicLoop} />
+                    </div>
+
+                    {/* Fade In */}
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Fade In ({bgMusicFadeIn.toFixed(1)}s)</Label>
+                      <Slider
+                        value={[bgMusicFadeIn]}
+                        min={0} max={5} step={0.5}
+                        onValueChange={([v]) => setBgMusicFadeIn(v)}
+                        className="py-1"
+                      />
+                    </div>
+
+                    {/* Fade Out */}
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Fade Out ({bgMusicFadeOut.toFixed(1)}s)</Label>
+                      <Slider
+                        value={[bgMusicFadeOut]}
+                        min={0} max={5} step={0.5}
+                        onValueChange={([v]) => setBgMusicFadeOut(v)}
                         className="py-1"
                       />
                     </div>
