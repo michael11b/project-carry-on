@@ -22,7 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Loader2, Pencil, Trash2, Eye, Image, FileText, Video, ExternalLink, Search, Filter,
+  Loader2, Pencil, Trash2, Eye, Image, FileText, Video, ExternalLink, Search, Filter, RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -73,6 +73,7 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
   const [editContent, setEditContent] = useState("");
   const [editStatus, setEditStatus] = useState<string>("draft");
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   // Delete dialog
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
@@ -143,6 +144,36 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
       toast({ title: "Update failed", description: (e as Error).message, variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSyncToFacebook = async () => {
+    if (!editPost?.published_fb_id) return;
+    setSyncing(true);
+    try {
+      // Save first
+      await supabase
+        .from("scheduled_posts")
+        .update({
+          title: editTitle.trim(),
+          content: editContent.trim(),
+          status: editStatus as any,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editPost.id);
+
+      const { data, error } = await supabase.functions.invoke("facebook-update", {
+        body: { post_id: editPost.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Updated on Facebook" });
+      setEditPost(null);
+      fetchPosts();
+    } catch (e) {
+      toast({ title: "Facebook update failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -362,9 +393,15 @@ export default function PostsManager({ orgId }: PostsManagerProps) {
               </Select>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={() => setEditPost(null)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}>
+            {editPost?.published_fb_id && editPost?.channel === "facebook" && (
+              <Button variant="secondary" onClick={handleSyncToFacebook} disabled={syncing || saving}>
+                {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                Update on Facebook
+              </Button>
+            )}
+            <Button onClick={handleSave} disabled={saving || syncing}>
               {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Save Changes
             </Button>
