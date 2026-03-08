@@ -565,7 +565,10 @@ export default function VideoCreator() {
           if (elapsed < 0.3) opacity = elapsed / 0.3;
           else if (elapsed > slideDurSec - 0.3) opacity = Math.max(0, (slideDurSec - elapsed) / 0.3);
 
-          drawFrame(offCtx, slide, phase, opacity);
+          const exportProgress = elapsed / slideDurSec;
+          // Generate fake waveform bars for export if waveform enabled
+          const exportWaveform = showWaveform ? new Float32Array(64).map(() => Math.random() * 180 + 20) : null;
+          drawFrame(offCtx, slide, phase, opacity, exportWaveform, exportProgress, showWaveform);
           await new Promise(r => setTimeout(r, 33)); // ~30fps
         }
       }
