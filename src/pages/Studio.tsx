@@ -363,6 +363,88 @@ export default function Studio() {
         </div>
       </motion.div>
 
+      {/* Editable Page Context */}
+      <Collapsible open={contextOpen} onOpenChange={setContextOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2 text-muted-foreground">
+            <Settings2 className="h-4 w-4" />
+            Content Context
+            <ChevronDown className={`h-4 w-4 transition-transform ${contextOpen ? "rotate-180" : ""}`} />
+            {(ctxDescription || ctxAudience || ctxTone) && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">Active</Badge>
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <Card className="mt-3">
+            <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Description</Label>
+                <Textarea
+                  placeholder="What is this content about?"
+                  value={ctxDescription}
+                  onChange={(e) => setCtxDescription(e.target.value)}
+                  className="min-h-[60px] text-xs resize-none"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Target Audience</Label>
+                <Input
+                  placeholder="e.g. Young crypto traders aged 18-35"
+                  value={ctxAudience}
+                  onChange={(e) => setCtxAudience(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Tone</Label>
+                <Select value={ctxTone} onValueChange={setCtxTone}>
+                  <SelectTrigger className="text-xs">
+                    <SelectValue placeholder="Select tone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="casual">Casual & Friendly</SelectItem>
+                    <SelectItem value="professional">Professional</SelectItem>
+                    <SelectItem value="inspirational">Inspirational</SelectItem>
+                    <SelectItem value="humorous">Humorous & Fun</SelectItem>
+                    <SelectItem value="educational">Educational</SelectItem>
+                    <SelectItem value="authoritative">Authoritative</SelectItem>
+                    <SelectItem value="empathetic">Empathetic & Warm</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Topics (comma-separated)</Label>
+                <Input
+                  placeholder="e.g. Bitcoin, Trading signals, Market analysis"
+                  value={ctxTopics}
+                  onChange={(e) => setCtxTopics(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Goals</Label>
+                <Input
+                  placeholder="e.g. Drive engagement, build trust"
+                  value={ctxGoals}
+                  onChange={(e) => setCtxGoals(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Hashtags</Label>
+                <Input
+                  placeholder="e.g. #Bitcoin #CryptoSignals"
+                  value={ctxHashtags}
+                  onChange={(e) => setCtxHashtags(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
+
       <Tabs defaultValue="text" className="space-y-4">
         <TabsList className="grid w-full max-w-lg grid-cols-4">
           <TabsTrigger value="text" className="gap-2">
