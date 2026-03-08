@@ -11,7 +11,7 @@ import {
 import {
   Sparkles, Loader2, Play, Pause, Download, Film,
   ChevronLeft, ChevronRight, RotateCcw, Volume2, AudioWaveform,
-  ImagePlus, VideoIcon, X, Type,
+  ImagePlus, VideoIcon, X, Type, Music, Upload, Trash2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -98,6 +98,15 @@ const TEXT_ANIMATIONS = [
   { value: "slide-up", label: "Slide Up" },
 ];
 
+const MUSIC_PRESETS = [
+  { value: "upbeat-pop", label: "Upbeat Pop", prompt: "Upbeat pop background music, energetic, catchy, modern, suitable for social media reels" },
+  { value: "chill-lofi", label: "Chill Lo-Fi", prompt: "Chill lo-fi hip hop background music, relaxing, calm beats, study vibes" },
+  { value: "cinematic", label: "Cinematic", prompt: "Cinematic epic background music, orchestral, inspiring, dramatic build-up" },
+  { value: "corporate", label: "Corporate", prompt: "Corporate background music, professional, motivational, light and clean" },
+  { value: "electronic", label: "Electronic", prompt: "Electronic dance background music, pulsing synths, energetic, modern EDM" },
+  { value: "acoustic", label: "Acoustic", prompt: "Acoustic guitar background music, warm, gentle, organic feel" },
+];
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function VideoCreator() {
@@ -157,6 +166,14 @@ export default function VideoCreator() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
 
+  // Background music state
+  const [bgMusicBlob, setBgMusicBlob] = useState<Blob | null>(null);
+  const [bgMusicUrl, setBgMusicUrl] = useState<string | null>(null);
+  const [bgMusicVolume, setBgMusicVolume] = useState(0.3);
+  const [isGeneratingMusic, setIsGeneratingMusic] = useState(false);
+  const [bgMusicName, setBgMusicName] = useState<string>("");
+  const bgMusicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const bgMusicFileInputRef = useRef<HTMLInputElement>(null);
   const ratio = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[0];
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -527,6 +544,16 @@ export default function VideoCreator() {
 
     playSlideAudio(slideIndex);
 
+    // Start background music
+    let bgMusicEl: HTMLAudioElement | null = null;
+    if (bgMusicUrl) {
+      bgMusicEl = new Audio(bgMusicUrl);
+      bgMusicEl.loop = true;
+      bgMusicEl.volume = bgMusicVolume;
+      bgMusicAudioRef.current = bgMusicEl;
+      bgMusicEl.play().catch(() => {});
+    }
+
     const animate = () => {
       const elapsed = (Date.now() - slideStartTime) / 1000;
       const slideDuration = getSlideDuration(slideIndex);
@@ -573,10 +600,11 @@ export default function VideoCreator() {
     return () => {
       cancelAnimationFrame(animationRef.current);
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      if (bgMusicEl) { bgMusicEl.pause(); bgMusicAudioRef.current = null; }
       if (audioCtx) { audioCtx.close().catch(() => {}); playbackAudioCtxRef.current = null; analyserRef.current = null; }
       setWaveformData(null);
     };
-  }, [isPlaying, getSlideDuration, showWaveform]);
+  }, [isPlaying, getSlideDuration, showWaveform, bgMusicUrl, bgMusicVolume]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────
 
@@ -687,6 +715,23 @@ export default function VideoCreator() {
       };
       mediaRecorder.start();
 
+      // Mix background music into export
+      let bgMusicSource: AudioBufferSourceNode | null = null;
+      if (bgMusicBlob) {
+        try {
+          const musicAb = await bgMusicBlob.arrayBuffer();
+          const musicBuf = await audioContext.decodeAudioData(musicAb);
+          const gainNode = audioContext.createGain();
+          gainNode.gain.value = bgMusicVolume;
+          bgMusicSource = audioContext.createBufferSource();
+          bgMusicSource.buffer = musicBuf;
+          bgMusicSource.loop = true;
+          bgMusicSource.connect(gainNode);
+          gainNode.connect(destination);
+          bgMusicSource.start();
+        } catch { /* ignore music decode errors */ }
+      }
+
       // Reset slide bg videos
       slideBgVideosRef.current.forEach((v) => { v.currentTime = 0; v.play().catch(() => {}); });
 
@@ -729,6 +774,7 @@ export default function VideoCreator() {
         }
       }
 
+      if (bgMusicSource) { try { bgMusicSource.stop(); } catch {} }
       mediaRecorder.stop();
       audioContext.close();
     } catch (e) {
@@ -853,7 +899,66 @@ export default function VideoCreator() {
     setBgLoadTick((t) => t + 1);
   };
 
-  // ─── Preview dimensions ────────────────────────────────────────────────
+  /** Generate background music from a preset */
+  const handleGenerateMusic = async (preset: typeof MUSIC_PRESETS[0]) => {
+    if (!script) return;
+    setIsGeneratingMusic(true);
+    try {
+      // Calculate total duration
+      let totalDur = 0;
+      for (let i = 0; i < script.slides.length; i++) totalDur += getSlideDuration(i);
+      totalDur = Math.min(Math.ceil(totalDur), 120); // Cap at 120s
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ prompt: preset.prompt, duration: totalDur }),
+        }
+      );
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: "Music generation failed" }));
+        throw new Error(err.error || "Music generation failed");
+      }
+      const blob = await response.blob();
+      if (bgMusicUrl) URL.revokeObjectURL(bgMusicUrl);
+      const url = URL.createObjectURL(blob);
+      setBgMusicBlob(blob);
+      setBgMusicUrl(url);
+      setBgMusicName(preset.label);
+      toast({ title: "Music generated!", description: `${preset.label} track ready.` });
+    } catch (e) {
+      toast({ title: "Music generation failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setIsGeneratingMusic(false);
+    }
+  };
+
+  /** Upload custom music file */
+  const handleMusicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (bgMusicUrl) URL.revokeObjectURL(bgMusicUrl);
+    const url = URL.createObjectURL(file);
+    setBgMusicBlob(file);
+    setBgMusicUrl(url);
+    setBgMusicName(file.name);
+    if (bgMusicFileInputRef.current) bgMusicFileInputRef.current.value = "";
+  };
+
+  /** Remove background music */
+  const handleRemoveMusic = () => {
+    if (bgMusicUrl) URL.revokeObjectURL(bgMusicUrl);
+    if (bgMusicAudioRef.current) { bgMusicAudioRef.current.pause(); bgMusicAudioRef.current = null; }
+    setBgMusicBlob(null);
+    setBgMusicUrl(null);
+    setBgMusicName("");
+  };
 
   const previewMaxHeight = 480;
   const previewWidth = (ratio.width / ratio.height) * previewMaxHeight;
@@ -1194,6 +1299,76 @@ export default function VideoCreator() {
                         {s.label}
                       </button>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Background Music */}
+              <div className="space-y-3 border border-border rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <Music className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-xs font-medium">Background Music</Label>
+                </div>
+
+                {bgMusicUrl ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between bg-muted/50 rounded-md px-2 py-1.5">
+                      <span className="text-xs truncate max-w-[180px]">{bgMusicName}</span>
+                      <button
+                        onClick={handleRemoveMusic}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Volume ({Math.round(bgMusicVolume * 100)}%)</Label>
+                      <Slider
+                        value={[bgMusicVolume]}
+                        min={0} max={1} step={0.05}
+                        onValueChange={([v]) => {
+                          setBgMusicVolume(v);
+                          if (bgMusicAudioRef.current) bgMusicAudioRef.current.volume = v;
+                        }}
+                        className="py-1"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-1 flex-wrap">
+                      {MUSIC_PRESETS.map((p) => (
+                        <button
+                          key={p.value}
+                          onClick={() => handleGenerateMusic(p)}
+                          disabled={isGeneratingMusic}
+                          className="px-2 py-0.5 rounded text-[10px] font-medium transition-colors bg-muted text-muted-foreground hover:bg-accent disabled:opacity-50"
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                    {isGeneratingMusic && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Generating music…
+                      </div>
+                    )}
+                    <input
+                      ref={bgMusicFileInputRef}
+                      type="file"
+                      accept="audio/*"
+                      className="hidden"
+                      onChange={handleMusicUpload}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 text-xs h-7"
+                      onClick={() => bgMusicFileInputRef.current?.click()}
+                    >
+                      <Upload className="h-3 w-3" /> Upload Custom Track
+                    </Button>
                   </div>
                 )}
               </div>
