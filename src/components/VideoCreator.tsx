@@ -424,7 +424,7 @@ export default function VideoCreator() {
       let phase = 0;
       for (let s = 0; s < script.slides.length; s++) {
         const slide = script.slides[s];
-        const durationMs = slide.duration * 1000;
+        const durationMs = getSlideDuration(s) * 1000;
         const startTime = Date.now();
 
         // Play audio for this slide
