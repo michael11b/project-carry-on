@@ -11,9 +11,10 @@ import {
 import {
   Sparkles, Loader2, Play, Pause, Download, Film,
   ChevronLeft, ChevronRight, RotateCcw, Volume2, AudioWaveform,
-  ImagePlus, VideoIcon, X,
+  ImagePlus, VideoIcon, X, Type,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -54,6 +55,37 @@ const GRADIENT_PRESETS = [
   "linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)",
   "linear-gradient(135deg, #0c3483 0%, #a2b6df 100%)",
 ];
+
+const FONT_OPTIONS = [
+  { value: "system-ui, -apple-system, sans-serif", label: "System" },
+  { value: "'Georgia', serif", label: "Georgia" },
+  { value: "'Courier New', monospace", label: "Mono" },
+  { value: "'Impact', sans-serif", label: "Impact" },
+  { value: "'Trebuchet MS', sans-serif", label: "Trebuchet" },
+  { value: "'Comic Sans MS', cursive", label: "Comic" },
+];
+
+const TEXT_POSITIONS = [
+  { value: "center", label: "Center" },
+  { value: "top", label: "Top" },
+  { value: "bottom", label: "Bottom" },
+];
+
+const TEXT_ANIMATIONS = [
+  { value: "fade", label: "Fade" },
+  { value: "typewriter", label: "Typewriter" },
+  { value: "scale", label: "Scale Up" },
+  { value: "slide-up", label: "Slide Up" },
+];
+
+interface TextStyle {
+  font: string;
+  sizeMultiplier: number; // 0.5 to 1.5, default 1
+  position: "center" | "top" | "bottom";
+  animation: "fade" | "typewriter" | "scale" | "slide-up";
+  bold: boolean;
+  color: string;
+}
 
 export default function VideoCreator() {
   const { toast } = useToast();
@@ -96,6 +128,16 @@ export default function VideoCreator() {
   const bgImageRef = useRef<HTMLImageElement | null>(null);
   const bgVideoRef = useRef<HTMLVideoElement | null>(null);
   const bgFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Text styling state
+  const [textStyle, setTextStyle] = useState<TextStyle>({
+    font: FONT_OPTIONS[0].value,
+    sizeMultiplier: 1,
+    position: "center",
+    animation: "fade",
+    bold: true,
+    color: "#ffffff",
+  });
 
   // Recording state
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -155,6 +197,7 @@ export default function VideoCreator() {
     waveStyle?: "bars" | "circular" | "line",
     bgImage?: HTMLImageElement | null,
     bgVideo?: HTMLVideoElement | null,
+    ts?: TextStyle,
   ) => {
     const { width, height } = ctx.canvas;
 
@@ -230,11 +273,13 @@ export default function VideoCreator() {
       }
     }
 
-    // Text rendering
-    ctx.globalAlpha = opacity;
+    // Text rendering with style options
+    const style = ts || { font: "system-ui, -apple-system, sans-serif", sizeMultiplier: 1, position: "center", animation: "fade", bold: true, color: "#ffffff" };
     const text = slide.text;
-    const fontSize = Math.min(width, height) * 0.06;
-    ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+    const baseFontSize = Math.min(width, height) * 0.06;
+    const fontSize = baseFontSize * style.sizeMultiplier;
+    const weight = style.bold ? "bold" : "normal";
+    ctx.font = `${weight} ${fontSize}px ${style.font}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
@@ -261,12 +306,93 @@ export default function VideoCreator() {
 
     const lineHeight = fontSize * 1.3;
     const totalHeight = lines.length * lineHeight;
-    const startY = height / 2 - totalHeight / 2 + lineHeight / 2;
 
-    ctx.fillStyle = "#ffffff";
-    lines.forEach((line, i) => {
-      ctx.fillText(line, width / 2, startY + i * lineHeight);
-    });
+    // Position
+    let baseY: number;
+    if (style.position === "top") {
+      baseY = height * 0.15 + lineHeight / 2;
+    } else if (style.position === "bottom") {
+      baseY = height * 0.7 - totalHeight / 2 + lineHeight / 2;
+    } else {
+      baseY = height / 2 - totalHeight / 2 + lineHeight / 2;
+    }
+
+    // Animation transforms
+    let textAlpha = opacity;
+    let offsetY = 0;
+    let scaleVal = 1;
+    const fadeTime = 0.3;
+    const slideDur = slide.duration || 3;
+    // Use progress if available, otherwise estimate from opacity
+    const elapsed = (progress || 0) * slideDur;
+
+    if (style.animation === "fade") {
+      textAlpha = opacity;
+    } else if (style.animation === "slide-up") {
+      if (elapsed < fadeTime) {
+        const t = elapsed / fadeTime;
+        textAlpha = t;
+        offsetY = (1 - t) * height * 0.05;
+      } else if (elapsed > slideDur - fadeTime) {
+        const t = Math.max(0, (slideDur - elapsed) / fadeTime);
+        textAlpha = t;
+        offsetY = -(1 - t) * height * 0.05;
+      }
+    } else if (style.animation === "scale") {
+      if (elapsed < fadeTime) {
+        const t = elapsed / fadeTime;
+        textAlpha = t;
+        scaleVal = 0.7 + t * 0.3;
+      } else if (elapsed > slideDur - fadeTime) {
+        const t = Math.max(0, (slideDur - elapsed) / fadeTime);
+        textAlpha = t;
+        scaleVal = 0.7 + t * 0.3;
+      }
+    } else if (style.animation === "typewriter") {
+      const revealProgress = Math.min(elapsed / (slideDur * 0.6), 1);
+      const totalChars = text.length;
+      const visibleChars = Math.floor(revealProgress * totalChars);
+      // We'll handle typewriter in the draw loop below
+      ctx.globalAlpha = opacity;
+      ctx.fillStyle = style.color;
+      // Rebuild lines with visible chars only
+      const visibleText = text.substring(0, visibleChars);
+      const twWords = visibleText.split(" ");
+      const twLines: string[] = [];
+      let twLine = "";
+      for (const word of twWords) {
+        const test = twLine ? `${twLine} ${word}` : word;
+        if (ctx.measureText(test).width > maxWidth && twLine) {
+          twLines.push(twLine);
+          twLine = word;
+        } else {
+          twLine = test;
+        }
+      }
+      if (twLine) twLines.push(twLine);
+      twLines.forEach((line, i) => {
+        ctx.fillText(line, width / 2, baseY + i * lineHeight);
+      });
+      ctx.globalAlpha = 1;
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+    }
+
+    // Apply scale transform if needed
+    if (style.animation !== "typewriter") {
+      ctx.save();
+      if (scaleVal !== 1) {
+        ctx.translate(width / 2, baseY + totalHeight / 2);
+        ctx.scale(scaleVal, scaleVal);
+        ctx.translate(-(width / 2), -(baseY + totalHeight / 2));
+      }
+      ctx.globalAlpha = textAlpha;
+      ctx.fillStyle = style.color;
+      lines.forEach((line, i) => {
+        ctx.fillText(line, width / 2, baseY + offsetY + i * lineHeight);
+      });
+      ctx.restore();
+    }
 
     ctx.globalAlpha = 1;
     ctx.shadowColor = "transparent";
@@ -408,9 +534,13 @@ export default function VideoCreator() {
     ctx.scale(previewScale, previewScale);
     const virtualCanvas = { width: ratio.width, height: ratio.height } as HTMLCanvasElement;
     Object.defineProperty(ctx, 'canvas', { value: virtualCanvas, configurable: true });
-    drawFrame(ctx, script.slides[currentSlide], gradientPhase, textOpacity, waveformData, playbackProgress, showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.current);
+    drawFrame(
+      ctx, script.slides[currentSlide], gradientPhase, textOpacity,
+      waveformData, playbackProgress, showWaveform, waveformStyle,
+      bgImageRef.current, bgVideoRef.current, textStyle
+    );
     ctx.restore();
-  }, [script, currentSlide, gradientPhase, textOpacity, drawFrame, ratio, waveformData, playbackProgress, showWaveform, bgType, bgMediaUrl]);
+  }, [script, currentSlide, gradientPhase, textOpacity, drawFrame, ratio, waveformData, playbackProgress, showWaveform, bgType, bgMediaUrl, textStyle]);
 
   // Animation loop for preview
   useEffect(() => {
@@ -687,7 +817,10 @@ export default function VideoCreator() {
           const exportProgress = elapsed / slideDurSec;
           // Generate fake waveform bars for export if waveform enabled
           const exportWaveform = showWaveform ? new Float32Array(64).map(() => Math.random() * 180 + 20) : null;
-          drawFrame(offCtx, slide, phase, opacity, exportWaveform, exportProgress, showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.current);
+          drawFrame(
+            offCtx, slide, phase, opacity, exportWaveform, exportProgress,
+            showWaveform, waveformStyle, bgImageRef.current, bgVideoRef.current, textStyle
+          );
           await new Promise(r => setTimeout(r, 33)); // ~30fps
         }
       }
@@ -927,6 +1060,89 @@ export default function VideoCreator() {
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* Text Styling */}
+              <div className="space-y-3 border border-border rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <Type className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-xs font-medium">Text Styling</Label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Font</Label>
+                    <Select value={textStyle.font} onValueChange={(v) => setTextStyle(s => ({ ...s, font: v }))}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {FONT_OPTIONS.map(f => (
+                          <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Position</Label>
+                    <Select value={textStyle.position} onValueChange={(v) => setTextStyle(s => ({ ...s, position: v as TextStyle["position"] }))}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TEXT_POSITIONS.map(p => (
+                          <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Size ({Math.round(textStyle.sizeMultiplier * 100)}%)</Label>
+                  <Slider
+                    value={[textStyle.sizeMultiplier]}
+                    min={0.5}
+                    max={1.8}
+                    step={0.1}
+                    onValueChange={([v]) => setTextStyle(s => ({ ...s, sizeMultiplier: v }))}
+                    className="py-1"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Animation</Label>
+                  <div className="flex gap-1 flex-wrap">
+                    {TEXT_ANIMATIONS.map(a => (
+                      <button
+                        key={a.value}
+                        onClick={() => setTextStyle(s => ({ ...s, animation: a.value as TextStyle["animation"] }))}
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                          textStyle.animation === a.value
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <Switch
+                      checked={textStyle.bold}
+                      onCheckedChange={(v) => setTextStyle(s => ({ ...s, bold: v }))}
+                    />
+                    <Label className="text-[10px]">Bold</Label>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-[10px]">Color</Label>
+                    <input
+                      type="color"
+                      value={textStyle.color}
+                      onChange={(e) => setTextStyle(s => ({ ...s, color: e.target.value }))}
+                      className="w-6 h-6 rounded border border-border cursor-pointer"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Slide editor */}
