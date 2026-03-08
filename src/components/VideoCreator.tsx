@@ -715,6 +715,23 @@ export default function VideoCreator() {
       };
       mediaRecorder.start();
 
+      // Mix background music into export
+      let bgMusicSource: AudioBufferSourceNode | null = null;
+      if (bgMusicBlob) {
+        try {
+          const musicAb = await bgMusicBlob.arrayBuffer();
+          const musicBuf = await audioContext.decodeAudioData(musicAb);
+          const gainNode = audioContext.createGain();
+          gainNode.gain.value = bgMusicVolume;
+          bgMusicSource = audioContext.createBufferSource();
+          bgMusicSource.buffer = musicBuf;
+          bgMusicSource.loop = true;
+          bgMusicSource.connect(gainNode);
+          gainNode.connect(destination);
+          bgMusicSource.start();
+        } catch { /* ignore music decode errors */ }
+      }
+
       // Reset slide bg videos
       slideBgVideosRef.current.forEach((v) => { v.currentTime = 0; v.play().catch(() => {}); });
 
