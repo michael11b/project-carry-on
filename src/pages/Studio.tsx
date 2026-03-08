@@ -78,6 +78,37 @@ export default function Studio() {
   // Page profile state
   const [pageProfiles, setPageProfiles] = useState<PageProfile[]>([]);
   const [selectedPageProfileId, setSelectedPageProfileId] = useState<string>("");
+  const [contextOpen, setContextOpen] = useState(false);
+
+  // Editable page context overrides (pre-populated from selected page)
+  const [ctxDescription, setCtxDescription] = useState("");
+  const [ctxAudience, setCtxAudience] = useState("");
+  const [ctxTone, setCtxTone] = useState("");
+  const [ctxTopics, setCtxTopics] = useState("");
+  const [ctxGoals, setCtxGoals] = useState("");
+  const [ctxHashtags, setCtxHashtags] = useState("");
+
+  // Sync overrides when page selection changes
+  useEffect(() => {
+    const page = pageProfiles.find((p) => p.id === selectedPageProfileId);
+    if (page) {
+      setCtxDescription(page.description || "");
+      setCtxAudience(page.target_audience || "");
+      setCtxTone(page.content_tone || "");
+      setCtxTopics(page.content_topics?.join(", ") || "");
+      setCtxGoals(page.posting_goals || "");
+      setCtxHashtags(page.hashtag_preferences || "");
+      setContextOpen(true);
+    } else {
+      setCtxDescription("");
+      setCtxAudience("");
+      setCtxTone("");
+      setCtxTopics("");
+      setCtxGoals("");
+      setCtxHashtags("");
+      setContextOpen(false);
+    }
+  }, [selectedPageProfileId, pageProfiles]);
 
   // Image tab state
   const [imagePrompt, setImagePrompt] = useState("");
