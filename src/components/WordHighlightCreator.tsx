@@ -882,6 +882,18 @@ export default function WordHighlightCreator() {
           )}
         </CardContent>
       </Card>
+
+      {/* Publish Panel */}
+      {exportedVideoUrl && (
+        <div className="lg:col-span-2">
+          <PublishPanel
+            content={scriptTitle || prompt || "Word highlight video"}
+            mediaUrl={exportedVideoUrl}
+            defaultTitle={scriptTitle || prompt?.slice(0, 80)}
+            hasContent={!!exportedVideoUrl}
+          />
+        </div>
+      )}
     </div>
   );
 }
