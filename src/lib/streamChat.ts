@@ -9,6 +9,8 @@ interface StreamGenerateOptions {
   };
   channel?: string;
   variantCount?: number;
+  contentType?: string;
+  pageContext?: Record<string, unknown>;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
