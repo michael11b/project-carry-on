@@ -83,6 +83,7 @@ export default function VideoCreator() {
   const [textOpacity, setTextOpacity] = useState(1);
   const [gradientPhase, setGradientPhase] = useState(0);
   const [showWaveform, setShowWaveform] = useState(false);
+  const [waveformStyle, setWaveformStyle] = useState<"bars" | "circular" | "line">("bars");
   const [waveformData, setWaveformData] = useState<Float32Array | null>(null);
   const [playbackProgress, setPlaybackProgress] = useState(0); // 0-1 progress within current slide
   const analyserRef = useRef<AnalyserNode | null>(null);
