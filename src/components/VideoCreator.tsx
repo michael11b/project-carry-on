@@ -144,6 +144,7 @@ export default function VideoCreator() {
     waveform?: Float32Array | null,
     progress?: number,
     renderWaveform?: boolean,
+    waveStyle?: "bars" | "circular" | "line",
   ) => {
     const { width, height } = ctx.canvas;
 
