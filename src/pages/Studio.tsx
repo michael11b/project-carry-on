@@ -18,6 +18,7 @@ import { streamGenerate } from "@/lib/streamChat";
 import TranslateTab from "@/components/TranslateTab";
 import PublishPanel from "@/components/PublishPanel";
 import VideoCreator from "@/components/VideoCreator";
+import WordHighlightCreator from "@/components/WordHighlightCreator";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Brand = Tables<"brands">;
