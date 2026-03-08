@@ -174,23 +174,24 @@ export default function Studio() {
         }
       : undefined;
 
-    // Determine content type based on page selection and channel
+    // Determine content type based on page selection
     const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
+    const hasPageContext = selectedPage || ctxDescription || ctxAudience || ctxTone || ctxTopics || ctxGoals || ctxHashtags;
     let contentType: string | undefined;
     if (selectedPage) {
-      contentType = "facebook_post"; // Page selected = Facebook post context
+      contentType = "facebook_post";
     }
 
-    // Build page context for the edge function
-    const pageContext = selectedPage ? {
-      page_name: selectedPage.page_name,
-      description: selectedPage.description,
-      target_audience: selectedPage.target_audience,
-      content_tone: selectedPage.content_tone,
-      content_topics: selectedPage.content_topics,
-      posting_goals: selectedPage.posting_goals,
-      hashtag_preferences: selectedPage.hashtag_preferences,
-      custom_system_prompt: selectedPage.system_prompt,
+    // Build page context from editable overrides
+    const pageContext = hasPageContext ? {
+      page_name: selectedPage?.page_name || "",
+      description: ctxDescription,
+      target_audience: ctxAudience,
+      content_tone: ctxTone,
+      content_topics: ctxTopics ? ctxTopics.split(",").map((t) => t.trim()).filter(Boolean) : [],
+      posting_goals: ctxGoals,
+      hashtag_preferences: ctxHashtags,
+      custom_system_prompt: selectedPage?.system_prompt || "",
     } : undefined;
 
     await streamGenerate({
