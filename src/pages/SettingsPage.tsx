@@ -12,6 +12,7 @@ import {
   Building2, CreditCard, Shield, Loader2, Save, Check, Zap, FileText, ImageIcon, Languages, Users,
   AlertTriangle, Lock, Mail, Plug,
 } from "lucide-react";
+import { useApprovalConfig } from "@/hooks/useApprovalConfig";
 import FacebookIntegrationCard from "@/components/FacebookIntegrationCard";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
