@@ -19,6 +19,16 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function SettingsPage() {
+  return <SettingsPageInner />;
+}
+
+function ApprovalToggle() {
+  const { approvalRequired, isOwnerOrAdmin, loading, toggleApproval } = useApprovalConfig();
+  if (loading) return <Loader2 className="h-4 w-4 animate-spin" />;
+  return <Switch checked={approvalRequired} onCheckedChange={toggleApproval} disabled={!isOwnerOrAdmin} />;
+}
+
+function SettingsPageInner() {
   const { toast } = useToast();
 
   // Org state
