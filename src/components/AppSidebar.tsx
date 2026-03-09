@@ -36,6 +36,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { usePendingApprovals } from "@/hooks/usePendingApprovals";
 
 const mainNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -61,6 +63,38 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { count: pendingCount } = usePendingApprovals();
+
+  const renderNavItem = (item: { title: string; url: string; icon: any }) => {
+    const isApprovals = item.url === "/approvals";
+    return (
+      <SidebarMenuItem key={item.title}>
+        <SidebarMenuButton asChild isActive={location.pathname === item.url}>
+          <NavLink to={item.url} className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+            <div className="relative">
+              <item.icon className="h-4 w-4" />
+              {isApprovals && pendingCount > 0 && collapsed && (
+                <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary" />
+              )}
+            </div>
+            {!collapsed && (
+              <span className="flex items-center justify-between flex-1">
+                <span>{item.title}</span>
+                {isApprovals && pendingCount > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold bg-primary text-primary-foreground"
+                  >
+                    {pendingCount > 99 ? "99+" : pendingCount}
+                  </Badge>
+                )}
+              </span>
+            )}
+          </NavLink>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
 
   return (
     <Sidebar collapsible="icon">
@@ -102,16 +136,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Overview</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                    <NavLink to={item.url} className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {mainNav.map(renderNavItem)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -120,16 +145,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Create</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {createNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                    <NavLink to={item.url} className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {createNav.map(renderNavItem)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -138,16 +154,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Manage</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {manageNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                    <NavLink to={item.url} className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {manageNav.map(renderNavItem)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
