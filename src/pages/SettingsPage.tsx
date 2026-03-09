@@ -13,6 +13,7 @@ import {
   AlertTriangle, Lock, Mail, Plug,
 } from "lucide-react";
 import { useApprovalConfig } from "@/hooks/useApprovalConfig";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import FacebookIntegrationCard from "@/components/FacebookIntegrationCard";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
