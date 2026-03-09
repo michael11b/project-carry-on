@@ -18,6 +18,7 @@ import ContentCalendar from "@/pages/ContentCalendar";
 import TeamManagement from "@/pages/TeamManagement";
 import SettingsPage from "@/pages/SettingsPage";
 import PagesConfig from "@/pages/PagesConfig";
+import ContentApprovals from "@/pages/ContentApprovals";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
               <Route path="/team" element={<TeamManagement />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/pages" element={<PagesConfig />} />
+              <Route path="/approvals" element={<ContentApprovals />} />
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
             <Route path="*" element={<NotFound />} />

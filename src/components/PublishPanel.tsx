@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useApprovalConfig } from "@/hooks/useApprovalConfig";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -13,7 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import {
   Send, CalendarDays, Loader2, CalendarIcon, CheckCircle2, AlertCircle,
-  ChevronLeft, ChevronRight, Plus, X, Upload,
+  ChevronLeft, ChevronRight, Plus, X, Upload, ShieldCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -316,6 +317,69 @@ export default function PublishPanel({ content, mediaUrl, mediaUrls, defaultTitl
     return urlData.publicUrl;
   };
 
+  const { approvalRequired, isOwnerOrAdmin } = useApprovalConfig();
+  const needsApproval = approvalRequired && !isOwnerOrAdmin;
+
+  const handleSubmitForApproval = async () => {
+    if (!orgId || publishing) return;
+    const postTitle = title.trim() || defaultTitle || "Studio post";
+
+    if (channel === "facebook" && !selectedPageId) {
+      toast({ title: "Select a Facebook page", variant: "destructive" });
+      return;
+    }
+    if (channel === "instagram" && !selectedIgId) {
+      toast({ title: "Select an Instagram account", variant: "destructive" });
+      return;
+    }
+
+    setPublishing(true);
+    setResult(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const resolvedMediaUrl = primaryMedia ? await resolveMediaUrl(primaryMedia) : null;
+
+      // Create post in draft status
+      const { data: newPost, error: insertErr } = await supabase.from("scheduled_posts").insert({
+        org_id: orgId,
+        created_by: user.id,
+        title: postTitle,
+        content: caption.trim() || postTitle,
+        channel,
+        status: "draft" as const,
+        scheduled_at: scheduleMode && scheduleDate
+          ? (() => { const [h, m] = scheduleTime.split(":").map(Number); const d = new Date(scheduleDate); d.setHours(h, m, 0, 0); return d.toISOString(); })()
+          : new Date().toISOString(),
+        facebook_page_id: channel === "facebook" ? selectedPageId : null,
+        instagram_account_id: channel === "instagram" ? selectedIgId : null,
+        post_type: postType,
+        media_url: resolvedMediaUrl,
+      }).select("id").single();
+      if (insertErr || !newPost) throw insertErr || new Error("Failed to create post");
+
+      // Create approval request
+      const { error: approvalErr } = await supabase.from("content_approvals").insert({
+        org_id: orgId,
+        post_id: newPost.id,
+        submitted_by: user.id,
+        status: "pending",
+      } as any);
+      if (approvalErr) throw approvalErr;
+
+      setResult({ success: true, message: "Submitted for approval!" });
+      toast({ title: "Submitted for approval", description: "An admin will review your content." });
+    } catch (e) {
+      const msg = (e as Error).message || "Submission failed";
+      setResult({ success: false, message: msg });
+      toast({ title: "Submission failed", description: msg, variant: "destructive" });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const handlePublish = async () => {
     if (!orgId || publishing) return;
 
@@ -541,21 +605,38 @@ export default function PublishPanel({ content, mediaUrl, mediaUrls, defaultTitl
             </div>
           )}
 
-          <Button
-            size="sm"
-            className="w-full gap-1.5"
-            onClick={handlePublish}
-            disabled={publishing || (scheduleMode && !scheduleDate)}
-          >
-            {publishing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : scheduleMode ? (
-              <CalendarDays className="h-3.5 w-3.5" />
-            ) : (
-              <Send className="h-3.5 w-3.5" />
-            )}
-            {publishing ? "Publishing…" : scheduleMode ? "Schedule" : "Publish Now"}
-          </Button>
+          {needsApproval ? (
+            <Button
+              size="sm"
+              className="w-full gap-1.5"
+              variant="secondary"
+              onClick={handleSubmitForApproval}
+              disabled={publishing || (scheduleMode && !scheduleDate)}
+            >
+              {publishing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ShieldCheck className="h-3.5 w-3.5" />
+              )}
+              {publishing ? "Submitting…" : "Submit for Approval"}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              className="w-full gap-1.5"
+              onClick={handlePublish}
+              disabled={publishing || (scheduleMode && !scheduleDate)}
+            >
+              {publishing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : scheduleMode ? (
+                <CalendarDays className="h-3.5 w-3.5" />
+              ) : (
+                <Send className="h-3.5 w-3.5" />
+              )}
+              {publishing ? "Publishing…" : scheduleMode ? "Schedule" : "Publish Now"}
+            </Button>
+          )}
 
           {result && (
             <div className={cn(

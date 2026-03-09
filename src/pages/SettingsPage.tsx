@@ -12,12 +12,23 @@ import {
   Building2, CreditCard, Shield, Loader2, Save, Check, Zap, FileText, ImageIcon, Languages, Users,
   AlertTriangle, Lock, Mail, Plug,
 } from "lucide-react";
+import { useApprovalConfig } from "@/hooks/useApprovalConfig";
 import FacebookIntegrationCard from "@/components/FacebookIntegrationCard";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function SettingsPage() {
+  return <SettingsPageInner />;
+}
+
+function ApprovalToggle() {
+  const { approvalRequired, isOwnerOrAdmin, loading, toggleApproval } = useApprovalConfig();
+  if (loading) return <Loader2 className="h-4 w-4 animate-spin" />;
+  return <Switch checked={approvalRequired} onCheckedChange={toggleApproval} disabled={!isOwnerOrAdmin} />;
+}
+
+function SettingsPageInner() {
   const { toast } = useToast();
 
   // Org state
@@ -223,6 +234,17 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground ml-6">Automatically save generated content to your Asset Library.</p>
                 </div>
                 <Switch checked={autoSave} onCheckedChange={setAutoSave} />
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm font-medium">Require Content Approval</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground ml-6">Editors must submit content for owner/admin approval before publishing.</p>
+                </div>
+                <ApprovalToggle />
               </div>
             </CardContent>
           </Card>
