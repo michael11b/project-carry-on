@@ -100,7 +100,7 @@ async function generateWithGoogleVeo(prompt: string, aspectRatio: string): Promi
   const body = {
     instances: [{ prompt }],
     parameters: {
-      aspectRatio: aspectRatio === "9:16" ? "9:16" : aspectRatio === "1:1" ? "1:1" : "16:9",
+      aspectRatio: aspectRatio === "9:16" ? "9:16" : "16:9",
       sampleCount: 1,
     },
   };

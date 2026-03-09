@@ -20,7 +20,7 @@ const MODELS = [
 const ASPECT_RATIOS = [
   { value: "16:9", label: "16:9 Landscape" },
   { value: "9:16", label: "9:16 Vertical (Reels)" },
-  { value: "1:1", label: "1:1 Square" },
+  { value: "1:1", label: "1:1 Square", soraOnly: true },
 ];
 
 export default function AIVideoGenerator() {
@@ -152,7 +152,7 @@ export default function AIVideoGenerator() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ASPECT_RATIOS.map((r) => (
+                {ASPECT_RATIOS.filter((r) => !r.soraOnly || model === "openai-sora").map((r) => (
                   <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                 ))}
               </SelectContent>
