@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { useAuthContext } from "@/components/AuthProvider";
 import { usePendingApprovals } from "@/hooks/usePendingApprovals";
 import { useApprovalActivity, ApprovalActivity } from "@/hooks/useApprovalActivity";
+import { useApprovalToasts } from "@/hooks/useApprovalToasts";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
@@ -58,6 +59,7 @@ export function DashboardLayout() {
   const { count: pendingCount } = usePendingApprovals();
   const { activities, loading: activitiesLoading } = useApprovalActivity();
   const navigate = useNavigate();
+  useApprovalToasts();
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
