@@ -23,15 +23,13 @@ async function generateWithGoogleVeo(prompt: string, aspectRatio: string): Promi
   const apiKey = Deno.env.get("GOOGLE_VEO_API_KEY");
   if (!apiKey) throw new Error("GOOGLE_VEO_API_KEY is not configured");
 
-  // Start generation using Gemini API with Veo model
-  const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/veo-2:generateVideos?key=${apiKey}`;
+  const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-preview:predictLongRunning?key=${apiKey}`;
 
   const body = {
     instances: [{ prompt }],
     config: {
       aspectRatio: aspectRatio === "9:16" ? "9:16" : aspectRatio === "1:1" ? "1:1" : "16:9",
       numberOfVideos: 1,
-      durationSeconds: 8,
     },
   };
 
@@ -44,14 +42,14 @@ async function generateWithGoogleVeo(prompt: string, aspectRatio: string): Promi
   if (!startRes.ok) {
     const errText = await startRes.text();
     console.error("Veo start error:", startRes.status, errText);
-    throw new Error(`Failed to start Veo generation: ${startRes.status}`);
+    throw new Error(`Failed to start Veo generation: ${startRes.status} - ${errText.slice(0, 200)}`);
   }
 
   const startData = await startRes.json();
   const operationName = startData.name;
 
   if (!operationName) {
-    // If result is already available
+    // Check for immediate result
     const video = startData.generatedVideos?.[0]?.video;
     if (video?.uri) return { videoUrl: video.uri };
     throw new Error("No operation name or immediate result from Veo");
