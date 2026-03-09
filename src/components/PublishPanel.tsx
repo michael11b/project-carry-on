@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import {
   Send, CalendarDays, Loader2, CalendarIcon, CheckCircle2, AlertCircle,
+  ChevronLeft, ChevronRight, Plus, X, Upload,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -33,15 +34,171 @@ interface InstagramAccount {
 interface PublishPanelProps {
   /** The text content to publish */
   content: string;
-  /** The media URL (for image posts) */
+  /** Single media URL (legacy compat) */
   mediaUrl?: string;
+  /** Multiple media URLs */
+  mediaUrls?: string[];
   /** Default title derived from the prompt */
   defaultTitle?: string;
   /** Whether there's content ready to publish */
   hasContent: boolean;
 }
 
-export default function PublishPanel({ content, mediaUrl, defaultTitle, hasContent }: PublishPanelProps) {
+function isVideoUrl(url: string) {
+  return url.includes(".webm") || url.includes(".mp4");
+}
+
+// ─── Media Carousel ────────────────────────────────────────────────────────
+
+function MediaCarousel({
+  items,
+  onRemove,
+  onAdd,
+  disabled,
+}: {
+  items: string[];
+  onRemove: (index: number) => void;
+  onAdd: (files: FileList) => void;
+  disabled: boolean;
+}) {
+  const [current, setCurrent] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Clamp index when items change
+  useEffect(() => {
+    if (current >= items.length) setCurrent(Math.max(0, items.length - 1));
+  }, [items.length, current]);
+
+  if (items.length === 0) {
+    return (
+      <div className="space-y-1.5">
+        <Label className="text-xs">Media</Label>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => fileRef.current?.click()}
+          className="w-full h-24 rounded border-2 border-dashed border-border bg-muted/50 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+        >
+          <Upload className="h-5 w-5" />
+          <span className="text-xs">Upload images or videos</span>
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          className="hidden"
+          onChange={(e) => e.target.files && onAdd(e.target.files)}
+        />
+      </div>
+    );
+  }
+
+  const url = items[current];
+  const video = isVideoUrl(url);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">
+          Media ({current + 1}/{items.length})
+        </Label>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => fileRef.current?.click()}
+            className="p-0.5 rounded hover:bg-muted text-muted-foreground"
+            title="Add more media"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            className="hidden"
+            onChange={(e) => e.target.files && onAdd(e.target.files)}
+          />
+        </div>
+      </div>
+
+      <div className="relative group">
+        {video ? (
+          <video
+            key={url}
+            src={url}
+            controls
+            className="w-full rounded border border-border bg-secondary max-h-[200px] object-contain"
+          />
+        ) : (
+          <img
+            key={url}
+            src={url}
+            alt={`Media ${current + 1}`}
+            className="w-full rounded border border-border bg-secondary max-h-[200px] object-contain"
+          />
+        )}
+
+        {/* Remove button */}
+        {!disabled && (
+          <button
+            type="button"
+            onClick={() => onRemove(current)}
+            className="absolute top-1.5 right-1.5 p-0.5 rounded-full bg-background/80 border border-border text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Remove"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+
+        {/* Navigation arrows */}
+        {items.length > 1 && (
+          <>
+            <button
+              type="button"
+              disabled={current === 0}
+              onClick={() => setCurrent((c) => c - 1)}
+              className="absolute left-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full bg-background/80 border border-border text-foreground disabled:opacity-30"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              disabled={current === items.length - 1}
+              onClick={() => setCurrent((c) => c + 1)}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full bg-background/80 border border-border text-foreground disabled:opacity-30"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Dots */}
+      {items.length > 1 && (
+        <div className="flex justify-center gap-1">
+          {items.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setCurrent(i)}
+              className={cn(
+                "h-1.5 rounded-full transition-all",
+                i === current ? "w-4 bg-primary" : "w-1.5 bg-muted-foreground/30"
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PublishPanel ──────────────────────────────────────────────────────────
+
+export default function PublishPanel({ content, mediaUrl, mediaUrls, defaultTitle, hasContent }: PublishPanelProps) {
   const { toast } = useToast();
   const [orgId, setOrgId] = useState<string | null>(null);
   const [channel, setChannel] = useState<string>("facebook");
@@ -57,6 +214,26 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
   const [caption, setCaption] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [allMedia, setAllMedia] = useState<string[]>([]);
+
+  // Merge incoming media props into allMedia
+  useEffect(() => {
+    const incoming: string[] = [];
+    if (mediaUrls?.length) {
+      incoming.push(...mediaUrls);
+    } else if (mediaUrl) {
+      incoming.push(mediaUrl);
+    }
+    if (incoming.length > 0) {
+      setAllMedia((prev) => {
+        const merged = [...prev];
+        for (const url of incoming) {
+          if (!merged.includes(url)) merged.push(url);
+        }
+        return merged;
+      });
+    }
+  }, [mediaUrl, mediaUrls]);
 
   // Sync default title and caption from props
   useEffect(() => {
@@ -98,8 +275,46 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
 
   useEffect(() => { fetchPages(); }, [fetchPages]);
 
-  const isVideo = mediaUrl?.includes(".webm") || mediaUrl?.includes(".mp4");
-  const postType = mediaUrl ? (isVideo ? "video" : "image") : "text";
+  const primaryMedia = allMedia[0] || null;
+  const primaryIsVideo = primaryMedia ? isVideoUrl(primaryMedia) : false;
+  const postType = primaryMedia ? (primaryIsVideo ? "video" : "image") : "text";
+
+  const handleRemoveMedia = (index: number) => {
+    setAllMedia((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddMedia = async (files: FileList) => {
+    if (!orgId) return;
+    const newUrls: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const ext = file.name.split(".").pop() || "bin";
+      const filePath = `${orgId}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage
+        .from("post-media")
+        .upload(filePath, file, { contentType: file.type, upsert: false });
+      if (error) {
+        toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+        continue;
+      }
+      const { data: urlData } = supabase.storage.from("post-media").getPublicUrl(filePath);
+      newUrls.push(urlData.publicUrl);
+    }
+    if (newUrls.length) setAllMedia((prev) => [...prev, ...newUrls]);
+  };
+
+  const resolveMediaUrl = async (url: string): Promise<string> => {
+    if (!url.startsWith("data:")) return url;
+    const blob = await fetch(url).then((r) => r.blob());
+    const ext = url.includes("image/png") ? "png" : "jpg";
+    const filePath = `${orgId}/${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage
+      .from("post-media")
+      .upload(filePath, blob, { contentType: blob.type, upsert: false });
+    if (error) throw new Error(`Upload failed: ${error.message}`);
+    const { data: urlData } = supabase.storage.from("post-media").getPublicUrl(filePath);
+    return urlData.publicUrl;
+  };
 
   const handlePublish = async () => {
     if (!orgId || publishing) return;
@@ -115,8 +330,8 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
       toast({ title: "Select an Instagram account", variant: "destructive" });
       return;
     }
-    if (channel === "instagram" && !mediaUrl) {
-      toast({ title: "Instagram requires a media URL", description: "Generate an image first.", variant: "destructive" });
+    if (channel === "instagram" && allMedia.length === 0) {
+      toast({ title: "Instagram requires media", description: "Add an image or video first.", variant: "destructive" });
       return;
     }
 
@@ -127,22 +342,10 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // If mediaUrl is a base64 data URL, upload to storage first
-      let resolvedMediaUrl = mediaUrl || null;
-      if (mediaUrl && mediaUrl.startsWith("data:")) {
-        const blob = await fetch(mediaUrl).then((r) => r.blob());
-        const ext = mediaUrl.includes("image/png") ? "png" : "jpg";
-        const filePath = `${orgId}/${crypto.randomUUID()}.${ext}`;
-        const { error: uploadErr } = await supabase.storage
-          .from("post-media")
-          .upload(filePath, blob, { contentType: blob.type, upsert: false });
-        if (uploadErr) throw new Error(`Upload failed: ${uploadErr.message}`);
-        const { data: urlData } = supabase.storage.from("post-media").getPublicUrl(filePath);
-        resolvedMediaUrl = urlData.publicUrl;
-      }
+      // Resolve the primary media URL (first item)
+      const resolvedMediaUrl = primaryMedia ? await resolveMediaUrl(primaryMedia) : null;
 
       if (scheduleMode && scheduleDate) {
-        // Create a scheduled post
         const [hours, mins] = scheduleTime.split(":").map(Number);
         const scheduledAt = new Date(scheduleDate);
         scheduledAt.setHours(hours, mins, 0, 0);
@@ -164,7 +367,6 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
         setResult({ success: true, message: `Scheduled for ${format(scheduledAt, "PPP 'at' h:mm a")}` });
         toast({ title: "Post scheduled!", description: `Will be published on ${format(scheduledAt, "PPP")}` });
       } else {
-        // Create post then publish immediately
         const { data: newPost, error: insertErr } = await supabase.from("scheduled_posts").insert({
           org_id: orgId,
           created_by: user.id,
@@ -180,7 +382,6 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
         }).select("id").single();
         if (insertErr || !newPost) throw insertErr || new Error("Failed to create post");
 
-        // Publish now
         const fnName = channel === "instagram" ? "instagram-publish" : "facebook-publish";
         const { data, error: pubErr } = await supabase.functions.invoke(fnName, {
           body: { post_id: newPost.id },
@@ -233,27 +434,12 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
             />
           </div>
 
-          {isVideo && mediaUrl && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Video Preview</Label>
-              <video
-                src={mediaUrl}
-                controls
-                className="w-full rounded border border-border bg-secondary max-h-[200px] object-contain"
-              />
-            </div>
-          )}
-
-          {!isVideo && mediaUrl && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Image Preview</Label>
-              <img
-                src={mediaUrl}
-                alt="Preview"
-                className="w-full rounded border border-border bg-secondary max-h-[200px] object-contain"
-              />
-            </div>
-          )}
+          <MediaCarousel
+            items={allMedia}
+            onRemove={handleRemoveMedia}
+            onAdd={handleAddMedia}
+            disabled={publishing}
+          />
 
           <div className="space-y-2">
             <Label className="text-xs">Caption / Post Text</Label>
