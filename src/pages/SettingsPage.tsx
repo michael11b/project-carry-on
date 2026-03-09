@@ -225,6 +225,17 @@ export default function SettingsPage() {
                 </div>
                 <Switch checked={autoSave} onCheckedChange={setAutoSave} />
               </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm font-medium">Require Content Approval</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground ml-6">Editors must submit content for owner/admin approval before publishing.</p>
+                </div>
+                <ApprovalToggle />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
