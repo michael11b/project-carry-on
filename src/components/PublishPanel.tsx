@@ -239,7 +239,7 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
               <video
                 src={mediaUrl}
                 controls
-                className="w-full rounded border border-border bg-black max-h-[200px] object-contain"
+                className="w-full rounded border border-border bg-secondary max-h-[200px] object-contain"
               />
             </div>
           )}
