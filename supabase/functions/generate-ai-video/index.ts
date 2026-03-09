@@ -133,8 +133,8 @@ async function generateWithGoogleVeo(prompt: string, aspectRatio: string): Promi
     throw new Error("No operation name from Vertex AI");
   }
 
-  // Poll using the full operation name with fetchPredictLongRunning
-  const pollUrl = `https://${location}-aiplatform.googleapis.com/v1/${operationName}:fetchPredictLongRunningOperation`;
+  // Poll using the full operation name with fetchPredictOperation
+  const pollUrl = `https://${location}-aiplatform.googleapis.com/v1/${operationName}:fetchPredictOperation`;
   const result = await pollOperation(pollUrl, accessToken, 180000);
 
   // Extract video URL from response
