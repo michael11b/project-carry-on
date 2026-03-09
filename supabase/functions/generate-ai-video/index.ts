@@ -55,8 +55,8 @@ async function generateWithGoogleVeo(prompt: string, aspectRatio: string): Promi
   }
 
   // Poll for completion
-  const pollUrl = `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${apiKey}`;
-  const result = await pollOperation(pollUrl, {}, 180000);
+  const pollUrl = `https://generativelanguage.googleapis.com/v1beta/${operationName}`;
+  const result = await pollOperation(pollUrl, { "x-goog-api-key": apiKey }, 180000);
 
   const videoResult = result.response?.generatedVideos?.[0]?.video;
   if (videoResult?.uri) return { videoUrl: videoResult.uri };
