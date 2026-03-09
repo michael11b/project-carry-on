@@ -1,61 +1,41 @@
-# ContentForge — Continuation Plan
 
-## Project Overview
-ContentForge is a multi-tenant content creation platform with AI-powered text generation, image generation, translation, and brand voice management.
 
-## Current State
+## Plan: Add AI Video Generation (Google Veo + OpenAI Sora) to Content Studio
 
-### Authentication & Authorization
-- [x] Email/password signup & login (verified ✅)
-- [x] Organization auto-creation on signup
-- [x] Role-based access control (owner/admin/editor/viewer/client_reviewer)
-- [x] Protected routes with AuthProvider
+### Overview
+Add an "AI Video" sub-section within the Video tab that lets users select a model (Google Veo or OpenAI Sora), enter a prompt, and generate a fully AI-created video. The generated video will be displayed in-line with a download button.
 
-### Pages & UI
-- [x] Dashboard with stats cards and quick actions (verified ✅)
-- [x] Brand Kit — create/view brands with voice profiles (verified ✅)
-- [x] Content Studio — Text tab with streaming generation (verified ✅)
-- [x] Content Studio — Image tab with platform presets (verified ✅)
-- [x] Content Studio — Translate tab with multi-language support (verified ✅)
-- [x] Sidebar navigation with collapsible layout (verified ✅)
-- [ ] Asset Library (placeholder)
-- [ ] Content Calendar (placeholder)
-- [ ] Team Management (placeholder)
-- [ ] Workspaces (placeholder)
-- [ ] Settings (placeholder)
+### Steps
 
-### Database Tables
-- organizations, organization_members, user_roles
-- profiles
-- brands (with voice_profile, colors, fonts, prohibited_terms)
-- workspaces
+**1. Securely store API keys**
+- Use the `add_secret` tool to request two secrets: `GOOGLE_VEO_API_KEY` and `OPENAI_VIDEO_API_KEY`.
 
-### Edge Functions
-- `generate-text` — SSE streaming text generation with brand voice
-- `generate-image` — AI image generation with platform presets
-- `translate-content` — Multi-language translation
+**2. Create edge function `generate-ai-video`**
+- File: `supabase/functions/generate-ai-video/index.ts`
+- Accepts `{ model: "google-veo" | "openai-sora", prompt: string, aspectRatio?: string }`
+- For **Google Veo**: Call `https://generativelanguage.googleapis.com/v1beta/models/veo-3-generate-preview:predictLongRunning` (or the appropriate Veo endpoint) using the stored API key. Veo returns a video generation operation that needs polling until complete, then returns a video URL/bytes.
+- For **OpenAI Sora**: Call `https://api.openai.com/v1/videos/generations` with the stored OpenAI key. Poll the generation status, then return the video URL.
+- Both APIs are async (generate → poll → result), so the edge function will handle polling internally and return the final video URL.
+- Add CORS headers, handle 429/402 errors, set `verify_jwt = false` in config.toml.
 
-### End-to-End Test Results (Verified 2026-03-05)
+**3. Create `AIVideoGenerator` component**
+- File: `src/components/AIVideoGenerator.tsx`
+- UI: Model selector (Google Veo / OpenAI Sora), prompt textarea, aspect ratio selector, "Generate" button.
+- Shows a loading state with progress indicator during generation (these APIs can take 30-120 seconds).
+- Displays the generated video in a `<video>` player with download button.
+- Option to save to Asset Library.
 
-All core features were tested via browser automation against the live preview:
+**4. Integrate into VideoCreator**
+- Add a toggle/tab at the top of the Video tab: "Slide Builder" (existing) vs "AI Video" (new).
+- When "AI Video" is selected, render `AIVideoGenerator` instead of the existing slide-based creator.
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Auth — Signup & Login | ✅ Verified | Email/password flow, redirect to dashboard, session persistence |
-| Dashboard | ✅ Verified | Stats cards, quick action tiles, sidebar navigation all render correctly |
-| Brand Kit — CRUD | ✅ Verified | Created "TechVibe" brand with playful tone, style guide, prohibited terms; card renders with voice badge |
-| Text Generation (streaming) | ✅ Verified | SSE streaming works, multi-variant output, channel presets (Instagram), copy button functional |
-| Brand Voice Integration | ✅ Verified | TechVibe brand voice correctly influenced text output — playful tone, emojis, avoided prohibited terms |
-| Image Generation | ✅ Verified | Platform presets work, skeleton loading state displays correctly, image renders with download button |
-| Translation (multi-language) | ✅ Verified | Spanish + French translations generated accurately, per-language copy buttons work, "Use generated text" cross-tab button works |
-| Sidebar Navigation | ✅ Verified | All nav links route correctly, collapsible sidebar works |
+### Technical Details
 
----
+- Google Veo API returns video as base64 or a GCS URL; the edge function will handle conversion.
+- OpenAI Sora returns a URL to the generated video.
+- Both APIs have long generation times (30s-2min), so the frontend will poll a status endpoint or the edge function will block until complete (with a timeout of ~3 minutes).
+- The edge function will normalize responses to `{ videoUrl: string, durationSeconds: number }`.
 
-## Next Steps (Priority Order)
+### API Key Flow
+Before implementing, I will request the two API keys from you using the secure secrets tool.
 
-1. **Team Management** — Invite by email, role assignment, member list
-2. **Workspaces CRUD** — Create, rename, archive, switch workspaces
-3. **Asset Library** — Save generated content, browse/filter/search
-4. **Content Calendar** — Schedule and plan content publishing
-5. **Settings** — User profile, org settings, billing placeholder
