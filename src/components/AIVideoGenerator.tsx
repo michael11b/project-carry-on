@@ -152,7 +152,7 @@ export default function AIVideoGenerator() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ASPECT_RATIOS.map((r) => (
+                {ASPECT_RATIOS.filter((r) => !r.soraOnly || model === "openai-sora").map((r) => (
                   <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                 ))}
               </SelectContent>
