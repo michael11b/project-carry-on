@@ -14,7 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import {
   Send, CalendarDays, Loader2, CalendarIcon, CheckCircle2, AlertCircle,
-  ChevronLeft, ChevronRight, Plus, X, Upload,
+  ChevronLeft, ChevronRight, Plus, X, Upload, ShieldCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
