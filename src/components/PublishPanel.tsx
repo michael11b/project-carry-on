@@ -244,6 +244,17 @@ export default function PublishPanel({ content, mediaUrl, defaultTitle, hasConte
             </div>
           )}
 
+          {!isVideo && mediaUrl && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Image Preview</Label>
+              <img
+                src={mediaUrl}
+                alt="Preview"
+                className="w-full rounded border border-border bg-secondary max-h-[200px] object-contain"
+              />
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label className="text-xs">Caption / Post Text</Label>
             <Textarea
