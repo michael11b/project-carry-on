@@ -109,6 +109,57 @@ export type Database = {
           },
         ]
       }
+      content_approvals: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string
+          post_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewer_comment: string | null
+          status: string
+          submitted_by: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id: string
+          post_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_comment?: string | null
+          status?: string
+          submitted_by: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string
+          post_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_comment?: string | null
+          status?: string
+          submitted_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_approvals_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_approvals_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       facebook_credentials: {
         Row: {
           app_id_encrypted: string
@@ -263,6 +314,7 @@ export type Database = {
       }
       organizations: {
         Row: {
+          approval_required: boolean
           created_at: string
           id: string
           logo_url: string | null
@@ -270,6 +322,7 @@ export type Database = {
           slug: string
         }
         Insert: {
+          approval_required?: boolean
           created_at?: string
           id?: string
           logo_url?: string | null
@@ -277,6 +330,7 @@ export type Database = {
           slug: string
         }
         Update: {
+          approval_required?: boolean
           created_at?: string
           id?: string
           logo_url?: string | null
