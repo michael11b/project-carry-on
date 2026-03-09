@@ -1842,5 +1842,7 @@ export default function VideoCreator() {
         </div>
       )}
     </div>
+      </TabsContent>
+    </Tabs>
   );
 }
