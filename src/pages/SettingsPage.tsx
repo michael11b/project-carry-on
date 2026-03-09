@@ -249,6 +249,16 @@ function SettingsPageInner() {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-display text-lg">Notification Preferences</CardTitle>
+              <CardDescription>Choose which in-app toast alerts you'd like to receive.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <NotificationPreferencesSection />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ── Usage & Billing ── */}
