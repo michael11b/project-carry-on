@@ -75,7 +75,9 @@ async function pollOperation(url: string, accessToken: string, maxWait = 180000)
   const start = Date.now();
   while (Date.now() - start < maxWait) {
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: "{}",
     });
     if (!res.ok) throw new Error(`Poll failed: ${res.status} ${await res.text()}`);
     const data = await res.json();
@@ -131,12 +133,8 @@ async function generateWithGoogleVeo(prompt: string, aspectRatio: string): Promi
     throw new Error("No operation name from Vertex AI");
   }
 
-  // Extract operation ID and build correct poll URL
-  // operationName format: "projects/{p}/locations/{l}/publishers/google/models/{m}/operations/{id}"
-  // Poll URL format: "projects/{p}/locations/{l}/operations/{id}"
-  const opIdMatch = operationName.match(/operations\/([^/]+)$/);
-  const opId = opIdMatch ? opIdMatch[1] : operationName;
-  const pollUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/operations/${opId}`;
+  // Poll using the full operation name with fetchPredictLongRunning
+  const pollUrl = `https://${location}-aiplatform.googleapis.com/v1/${operationName}:fetchPredictLongRunningOperation`;
   const result = await pollOperation(pollUrl, accessToken, 180000);
 
   // Extract video URL from response
