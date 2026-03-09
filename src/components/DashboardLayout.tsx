@@ -59,6 +59,7 @@ export function DashboardLayout() {
   const { count: pendingCount } = usePendingApprovals();
   const { activities, loading: activitiesLoading } = useApprovalActivity();
   const navigate = useNavigate();
+  useApprovalToasts();
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
