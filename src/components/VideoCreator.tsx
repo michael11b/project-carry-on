@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import AIVideoGenerator from "@/components/AIVideoGenerator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -1239,6 +1241,17 @@ export default function VideoCreator() {
   // ─── Render ────────────────────────────────────────────────────────────
 
   return (
+    <Tabs defaultValue="slide-builder" className="w-full">
+      <TabsList className="mb-4">
+        <TabsTrigger value="slide-builder">Slide Builder</TabsTrigger>
+        <TabsTrigger value="ai-video">AI Video</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="ai-video">
+        <AIVideoGenerator />
+      </TabsContent>
+
+      <TabsContent value="slide-builder">
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Hidden file input for per-slide bg uploads */}
       <input
@@ -1829,5 +1842,7 @@ export default function VideoCreator() {
         </div>
       )}
     </div>
+      </TabsContent>
+    </Tabs>
   );
 }
