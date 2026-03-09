@@ -15,30 +15,21 @@ export interface ApprovalActivity {
 export function useApprovalActivity() {
   const [activities, setActivities] = useState<ApprovalActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [orgId, setOrgId] = useState<string | null>(null);
 
-  const fetchActivity = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setLoading(false); return; }
-
-    const { data: memberships } = await supabase
-      .from("organization_members")
-      .select("org_id")
-      .eq("user_id", user.id);
-
-    if (!memberships?.length) { setLoading(false); return; }
-
-    const orgId = memberships[0].org_id;
+  const fetchActivity = useCallback(async (oid?: string) => {
+    const id = oid || orgId;
+    if (!id) return;
 
     const { data, error } = await supabase
       .from("content_approvals")
       .select("*")
-      .eq("org_id", orgId)
+      .eq("org_id", id)
       .order("created_at", { ascending: false })
       .limit(10);
 
     if (error || !data) { setLoading(false); return; }
 
-    // Enrich with post titles and user names
     const postIds = [...new Set(data.map((a: any) => a.post_id))];
     const userIds = [...new Set([
       ...data.map((a: any) => a.submitted_by),
@@ -66,13 +57,42 @@ export function useApprovalActivity() {
 
     setActivities(enriched);
     setLoading(false);
+  }, [orgId]);
+
+  // Initial fetch + get orgId
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoading(false); return; }
+
+      const { data: memberships } = await supabase
+        .from("organization_members")
+        .select("org_id")
+        .eq("user_id", user.id);
+
+      if (!memberships?.length) { setLoading(false); return; }
+
+      const oid = memberships[0].org_id;
+      setOrgId(oid);
+      fetchActivity(oid);
+    })();
   }, []);
 
+  // Subscribe to realtime changes
   useEffect(() => {
-    fetchActivity();
-    const interval = setInterval(fetchActivity, 30000);
-    return () => clearInterval(interval);
-  }, [fetchActivity]);
+    if (!orgId) return;
 
-  return { activities, loading, refetch: fetchActivity };
+    const channel = supabase
+      .channel("approvals-activity")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "content_approvals", filter: `org_id=eq.${orgId}` },
+        () => fetchActivity()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [orgId, fetchActivity]);
+
+  return { activities, loading, refetch: () => fetchActivity() };
 }
