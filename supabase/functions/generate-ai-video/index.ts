@@ -23,19 +23,18 @@ async function generateWithGoogleVeo(prompt: string, aspectRatio: string): Promi
   const apiKey = Deno.env.get("GOOGLE_VEO_API_KEY");
   if (!apiKey) throw new Error("GOOGLE_VEO_API_KEY is not configured");
 
-  const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-preview:predictLongRunning?key=${apiKey}`;
+  const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-preview:predictLongRunning`;
 
   const body = {
     instances: [{ prompt }],
-    config: {
-      aspectRatio: aspectRatio === "9:16" ? "9:16" : aspectRatio === "1:1" ? "1:1" : "16:9",
-      numberOfVideos: 1,
-    },
   };
 
   const startRes = await fetch(generateUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
     body: JSON.stringify(body),
   });
 
