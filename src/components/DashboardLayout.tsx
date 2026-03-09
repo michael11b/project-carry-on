@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { useAuthContext } from "@/components/AuthProvider";
 import { usePendingApprovals } from "@/hooks/usePendingApprovals";
 import { useApprovalActivity, ApprovalActivity } from "@/hooks/useApprovalActivity";
+import { useApprovalToasts } from "@/hooks/useApprovalToasts";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
