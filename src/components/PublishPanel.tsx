@@ -605,21 +605,38 @@ export default function PublishPanel({ content, mediaUrl, mediaUrls, defaultTitl
             </div>
           )}
 
-          <Button
-            size="sm"
-            className="w-full gap-1.5"
-            onClick={handlePublish}
-            disabled={publishing || (scheduleMode && !scheduleDate)}
-          >
-            {publishing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : scheduleMode ? (
-              <CalendarDays className="h-3.5 w-3.5" />
-            ) : (
-              <Send className="h-3.5 w-3.5" />
-            )}
-            {publishing ? "Publishing…" : scheduleMode ? "Schedule" : "Publish Now"}
-          </Button>
+          {needsApproval ? (
+            <Button
+              size="sm"
+              className="w-full gap-1.5"
+              variant="secondary"
+              onClick={handleSubmitForApproval}
+              disabled={publishing || (scheduleMode && !scheduleDate)}
+            >
+              {publishing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ShieldCheck className="h-3.5 w-3.5" />
+              )}
+              {publishing ? "Submitting…" : "Submit for Approval"}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              className="w-full gap-1.5"
+              onClick={handlePublish}
+              disabled={publishing || (scheduleMode && !scheduleDate)}
+            >
+              {publishing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : scheduleMode ? (
+                <CalendarDays className="h-3.5 w-3.5" />
+              ) : (
+                <Send className="h-3.5 w-3.5" />
+              )}
+              {publishing ? "Publishing…" : scheduleMode ? "Schedule" : "Publish Now"}
+            </Button>
+          )}
 
           {result && (
             <div className={cn(

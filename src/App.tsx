@@ -44,6 +44,7 @@ const App = () => (
               <Route path="/team" element={<TeamManagement />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/pages" element={<PagesConfig />} />
+              <Route path="/approvals" element={<ContentApprovals />} />
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
