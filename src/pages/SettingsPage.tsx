@@ -29,6 +29,34 @@ function ApprovalToggle() {
   return <Switch checked={approvalRequired} onCheckedChange={toggleApproval} disabled={!isOwnerOrAdmin} />;
 }
 
+function NotificationPreferencesSection() {
+  const { prefs, update } = useNotificationPreferences();
+  const items = [
+    { key: "submissions" as const, label: "New Submissions", desc: "When someone submits content for approval.", icon: SendIcon },
+    { key: "approvals" as const, label: "Approvals", desc: "When your submitted content is approved.", icon: CheckCircle2 },
+    { key: "rejections" as const, label: "Rejections", desc: "When your submitted content is rejected.", icon: XCircle },
+  ];
+  return (
+    <>
+      {items.map((item, i) => (
+        <div key={item.key}>
+          {i > 0 && <Separator className="mb-6" />}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <item.icon className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">{item.label}</Label>
+              </div>
+              <p className="text-xs text-muted-foreground ml-6">{item.desc}</p>
+            </div>
+            <Switch checked={prefs[item.key]} onCheckedChange={(v) => update(item.key, v)} />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function SettingsPageInner() {
   const { toast } = useToast();
 
