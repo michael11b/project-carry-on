@@ -75,7 +75,9 @@ async function pollOperation(url: string, accessToken: string, maxWait = 180000)
   const start = Date.now();
   while (Date.now() - start < maxWait) {
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: "{}",
     });
     if (!res.ok) throw new Error(`Poll failed: ${res.status} ${await res.text()}`);
     const data = await res.json();
