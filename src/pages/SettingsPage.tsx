@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import {
   Building2, CreditCard, Shield, Loader2, Save, Check, Zap, FileText, ImageIcon, Languages, Users,
-  AlertTriangle, Lock, Mail, Plug,
+  AlertTriangle, Lock, Mail, Plug, Bell, CheckCircle2, XCircle, Send as SendIcon,
 } from "lucide-react";
 import { useApprovalConfig } from "@/hooks/useApprovalConfig";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
