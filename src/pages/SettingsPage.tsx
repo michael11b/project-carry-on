@@ -10,9 +10,10 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import {
   Building2, CreditCard, Shield, Loader2, Save, Check, Zap, FileText, ImageIcon, Languages, Users,
-  AlertTriangle, Lock, Mail, Plug,
+  AlertTriangle, Lock, Mail, Plug, Bell, CheckCircle2, XCircle, Send as SendIcon,
 } from "lucide-react";
 import { useApprovalConfig } from "@/hooks/useApprovalConfig";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import FacebookIntegrationCard from "@/components/FacebookIntegrationCard";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +27,34 @@ function ApprovalToggle() {
   const { approvalRequired, isOwnerOrAdmin, loading, toggleApproval } = useApprovalConfig();
   if (loading) return <Loader2 className="h-4 w-4 animate-spin" />;
   return <Switch checked={approvalRequired} onCheckedChange={toggleApproval} disabled={!isOwnerOrAdmin} />;
+}
+
+function NotificationPreferencesSection() {
+  const { prefs, update } = useNotificationPreferences();
+  const items = [
+    { key: "submissions" as const, label: "New Submissions", desc: "When someone submits content for approval.", icon: SendIcon },
+    { key: "approvals" as const, label: "Approvals", desc: "When your submitted content is approved.", icon: CheckCircle2 },
+    { key: "rejections" as const, label: "Rejections", desc: "When your submitted content is rejected.", icon: XCircle },
+  ];
+  return (
+    <>
+      {items.map((item, i) => (
+        <div key={item.key}>
+          {i > 0 && <Separator className="mb-6" />}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <item.icon className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">{item.label}</Label>
+              </div>
+              <p className="text-xs text-muted-foreground ml-6">{item.desc}</p>
+            </div>
+            <Switch checked={prefs[item.key]} onCheckedChange={(v) => update(item.key, v)} />
+          </div>
+        </div>
+      ))}
+    </>
+  );
 }
 
 function SettingsPageInner() {
@@ -246,6 +275,16 @@ function SettingsPageInner() {
                 </div>
                 <ApprovalToggle />
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-display text-lg">Notification Preferences</CardTitle>
+              <CardDescription>Choose which in-app toast alerts you'd like to receive.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <NotificationPreferencesSection />
             </CardContent>
           </Card>
         </TabsContent>
