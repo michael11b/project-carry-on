@@ -122,18 +122,21 @@ async function generateWithGoogleVeo(prompt: string, aspectRatio: string): Promi
   }
 
   const startData = await startRes.json();
+  console.log("Veo start response:", JSON.stringify(startData).slice(0, 500));
   const operationName = startData.name;
 
   if (!operationName) {
-    // Check for immediate result
     const vid = startData.predictions?.[0]?.videoUri;
     if (vid) return { videoUrl: vid };
     throw new Error("No operation name from Vertex AI");
   }
 
-  // Poll for completion
-  const pollUrl = `https://${location}-aiplatform.googleapis.com/v1/${operationName}`;
-  console.log("Polling operation:", operationName);
+  // Extract operation ID and build correct poll URL
+  // operationName format: "projects/{p}/locations/{l}/publishers/google/models/{m}/operations/{id}"
+  // Poll URL format: "projects/{p}/locations/{l}/operations/{id}"
+  const opIdMatch = operationName.match(/operations\/([^/]+)$/);
+  const opId = opIdMatch ? opIdMatch[1] : operationName;
+  const pollUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/operations/${opId}`;
   const result = await pollOperation(pollUrl, accessToken, 180000);
 
   // Extract video URL from response
