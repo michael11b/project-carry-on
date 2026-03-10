@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save, Facebook, ChevronDown, Settings2, Film, Type } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Save, Facebook, ChevronDown, Settings2, Film, Type } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,6 +19,7 @@ import TranslateTab from "@/components/TranslateTab";
 import PublishPanel from "@/components/PublishPanel";
 import VideoCreator from "@/components/VideoCreator";
 import WordHighlightCreator from "@/components/WordHighlightCreator";
+import ImageChat from "@/components/ImageChat";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Brand = Tables<"brands">;
@@ -52,16 +53,6 @@ const VARIANT_COUNTS = [
   { value: "10", label: "10 variants" },
 ];
 
-const IMAGE_PLATFORMS = [
-  { value: "instagram_post", label: "Instagram Post (1:1)" },
-  { value: "instagram_story", label: "Instagram Story (9:16)" },
-  { value: "facebook_post", label: "Facebook Post (landscape)" },
-  { value: "linkedin_post", label: "LinkedIn Post (landscape)" },
-  { value: "twitter_post", label: "Twitter/X Post (16:9)" },
-  { value: "tiktok_cover", label: "TikTok Cover (9:16)" },
-  { value: "blog_header", label: "Blog Header (2:1)" },
-  { value: "ad_banner", label: "Ad Banner (landscape)" },
-];
 
 export default function Studio() {
   const { toast } = useToast();
@@ -76,7 +67,7 @@ export default function Studio() {
   const [usedChannel, setUsedChannel] = useState<string>("");
   const [usedBrand, setUsedBrand] = useState<string>("");
   const [savingText, setSavingText] = useState(false);
-  const [savingImage, setSavingImage] = useState(false);
+  
 
   // Page profile state
   const [pageProfiles, setPageProfiles] = useState<PageProfile[]>([]);
@@ -113,15 +104,14 @@ export default function Studio() {
     }
   }, [selectedPageProfileId, pageProfiles]);
 
-  // Image tab state
-  const [imagePrompt, setImagePrompt] = useState("");
-  const [imagePlatform, setImagePlatform] = useState<string>("");
-  const [imageBrandId, setImageBrandId] = useState<string>("");
-  const [imageUrl, setImageUrl] = useState<string>("");
-  const [imageDescription, setImageDescription] = useState("");
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [usedImagePlatform, setUsedImagePlatform] = useState<string>("");
-  const [usedImageBrand, setUsedImageBrand] = useState<string>("");
+  // Image chat gets brands, page context, and content type as props
+  const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
+  const imagePageContext = (selectedPage || ctxDescription || ctxTone) ? {
+    page_name: selectedPage?.page_name || "",
+    description: ctxDescription,
+    content_tone: ctxTone,
+  } : undefined;
+  const imageContentType = selectedPage ? "facebook_post_image" : undefined;
 
   // Fetch brands and page profiles for the current user's org
   useEffect(() => {
@@ -244,99 +234,7 @@ export default function Studio() {
     }
   }, [output, prompt, usedChannel, usedBrand, toast]);
 
-  const handleSaveImage = useCallback(async () => {
-    if (!imageUrl) return;
-    setSavingImage(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-      const { data: memberships } = await supabase.from("organization_members").select("org_id").eq("user_id", user.id);
-      if (!memberships?.length) throw new Error("No organization");
-      const title = imagePrompt.trim().slice(0, 80) || "Untitled image";
-      const platformLabel = IMAGE_PLATFORMS.find((p) => p.value === usedImagePlatform)?.label || "";
-      const { error } = await supabase.from("assets").insert({
-        org_id: memberships[0].org_id,
-        created_by: user.id,
-        type: "image" as const,
-        title,
-        content: imageUrl,
-        metadata: { platform: platformLabel, brand: usedImageBrand || "" },
-      });
-      if (error) throw error;
-      toast({ title: "Saved to library", description: "Image saved to your Asset Library." });
-    } catch (e) {
-      toast({ title: "Save failed", description: (e as Error).message, variant: "destructive" });
-    } finally {
-      setSavingImage(false);
-    }
-  }, [imageUrl, imagePrompt, usedImagePlatform, usedImageBrand, toast]);
-
-  const handleGenerateImage = useCallback(async () => {
-    if (!imagePrompt.trim()) {
-      toast({ title: "Enter a prompt", description: "Describe the image you want to generate.", variant: "destructive" });
-      return;
-    }
-
-    setIsGeneratingImage(true);
-    setImageUrl("");
-    setImageDescription("");
-    setUsedImagePlatform(imagePlatform);
-
-    const selectedBrand = brands.find((b) => b.id === imageBrandId);
-    setUsedImageBrand(selectedBrand?.name || "");
-
-    const brandStyle = selectedBrand
-      ? {
-          name: selectedBrand.name,
-          colors: selectedBrand.colors as Record<string, string> | undefined,
-          tone: (selectedBrand.voice_profile as Record<string, string> | null)?.tone,
-        }
-      : undefined;
-
-    // Build page context from editable overrides for images
-    const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
-    let contentType: string | undefined;
-    if (selectedPage) {
-      contentType = "facebook_post_image";
-    }
-
-    const pageContext = (selectedPage || ctxDescription || ctxTone) ? {
-      page_name: selectedPage?.page_name || "",
-      description: ctxDescription,
-      content_tone: ctxTone,
-    } : undefined;
-
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-image", {
-        body: {
-          prompt: imagePrompt.trim(),
-          brandStyle,
-          platform: imagePlatform || undefined,
-          contentType,
-          pageContext,
-        },
-      });
-
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
-
-      setImageUrl(data.imageUrl);
-      setImageDescription(data.description || "");
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Image generation failed";
-      toast({ title: "Generation failed", description: msg, variant: "destructive" });
-    } finally {
-      setIsGeneratingImage(false);
-    }
-  }, [imagePrompt, imagePlatform, imageBrandId, brands, toast]);
-
-  const handleDownloadImage = useCallback(() => {
-    if (!imageUrl) return;
-    const a = document.createElement("a");
-    a.href = imageUrl;
-    a.download = `generated-image-${Date.now()}.png`;
-    a.click();
-  }, [imageUrl]);
+  // Image generation is now handled by ImageChat component
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -604,136 +502,11 @@ export default function Studio() {
         </TabsContent>
 
         <TabsContent value="image">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Image Input Panel */}
-            <Card>
-              <CardContent className="p-6 space-y-4">
-                <h3 className="font-display font-semibold text-lg">Generate Image</h3>
-
-                <div className="space-y-2">
-                  <Label>Image Description</Label>
-                  <Textarea
-                    placeholder="Describe the image you want... e.g. 'A minimalist product photo of a skincare bottle on a marble surface with soft natural lighting'"
-                    className="min-h-[120px] resize-none"
-                    value={imagePrompt}
-                    onChange={(e) => setImagePrompt(e.target.value)}
-                    disabled={isGeneratingImage}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Platform / Size</Label>
-                  <Select value={imagePlatform} onValueChange={setImagePlatform} disabled={isGeneratingImage}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Any size" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {IMAGE_PLATFORMS.map((p) => (
-                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {brands.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Brand Style</Label>
-                    <Select value={imageBrandId} onValueChange={setImageBrandId} disabled={isGeneratingImage}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="No brand style" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {brands.map((b) => (
-                          <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <Button onClick={handleGenerateImage} disabled={isGeneratingImage} className="gap-2 w-full sm:w-auto">
-                  {isGeneratingImage ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <Image className="h-4 w-4" />
-                      Generate Image
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Image Output Panel */}
-            <Card>
-              <CardContent className="p-6 flex flex-col min-h-[360px]">
-                {isGeneratingImage ? (
-                  <div className="flex-1 flex flex-col gap-4">
-                    <Skeleton className="w-full aspect-square rounded-md" />
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-4 w-1/2" />
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-auto">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating image…
-                    </div>
-                  </div>
-                ) : imageUrl ? (
-                  <>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        {usedImagePlatform && (
-                          <Badge variant="secondary">
-                            {IMAGE_PLATFORMS.find((p) => p.value === usedImagePlatform)?.label || usedImagePlatform}
-                          </Badge>
-                        )}
-                        {usedImageBrand && (
-                          <Badge variant="outline">{usedImageBrand}</Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="sm" onClick={handleSaveImage} disabled={savingImage} className="gap-1.5">
-                          {savingImage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                          Save
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={handleDownloadImage} className="gap-1.5">
-                          <Download className="h-3.5 w-3.5" />
-                          Download
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="flex-1 flex items-center justify-center">
-                      <img
-                        src={imageUrl}
-                        alt={imageDescription || "Generated image"}
-                        className="max-w-full max-h-[500px] rounded-md border border-border object-contain"
-                      />
-                    </div>
-                    {imageDescription && (
-                      <p className="text-sm text-muted-foreground mt-3">{imageDescription}</p>
-                    )}
-                    <PublishPanel
-                      content={imageDescription || imagePrompt}
-                      mediaUrl={imageUrl}
-                      defaultTitle={imagePrompt.trim().slice(0, 80)}
-                      hasContent={!!imageUrl}
-                    />
-                  </>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                    <div className="text-center">
-                      <Image className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
-                      <p>Generated image will appear here</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          <ImageChat
+            brands={brands}
+            pageContext={imagePageContext}
+            contentType={imageContentType}
+          />
         </TabsContent>
 
         <TabsContent value="video">
