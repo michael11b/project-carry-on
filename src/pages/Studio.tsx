@@ -53,16 +53,6 @@ const VARIANT_COUNTS = [
   { value: "10", label: "10 variants" },
 ];
 
-const IMAGE_PLATFORMS = [
-  { value: "instagram_post", label: "Instagram Post (1:1)" },
-  { value: "instagram_story", label: "Instagram Story (9:16)" },
-  { value: "facebook_post", label: "Facebook Post (landscape)" },
-  { value: "linkedin_post", label: "LinkedIn Post (landscape)" },
-  { value: "twitter_post", label: "Twitter/X Post (16:9)" },
-  { value: "tiktok_cover", label: "TikTok Cover (9:16)" },
-  { value: "blog_header", label: "Blog Header (2:1)" },
-  { value: "ad_banner", label: "Ad Banner (landscape)" },
-];
 
 export default function Studio() {
   const { toast } = useToast();
