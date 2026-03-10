@@ -31,6 +31,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   text: string;
   imageUrl?: string;
+  referenceImageUrl?: string;
   variations?: Array<{ imageUrl: string; description: string }>;
   isLoading?: boolean;
   timestamp: number;
