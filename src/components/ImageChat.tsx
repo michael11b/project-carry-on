@@ -55,6 +55,8 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
   const [brandId, setBrandId] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [publishImageUrl, setPublishImageUrl] = useState<string | null>(null);
+  const [publishPromptText, setPublishPromptText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
