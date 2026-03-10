@@ -67,7 +67,7 @@ export default function Studio() {
   const [usedChannel, setUsedChannel] = useState<string>("");
   const [usedBrand, setUsedBrand] = useState<string>("");
   const [savingText, setSavingText] = useState(false);
-  const [savingImage, setSavingImage] = useState(false);
+  
 
   // Page profile state
   const [pageProfiles, setPageProfiles] = useState<PageProfile[]>([]);
