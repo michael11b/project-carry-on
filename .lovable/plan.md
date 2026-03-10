@@ -1,61 +1,22 @@
-# ContentForge — Continuation Plan
 
-## Project Overview
-ContentForge is a multi-tenant content creation platform with AI-powered text generation, image generation, translation, and brand voice management.
 
-## Current State
+## Plan: Add Schedule/Publish Option to Image Chat
 
-### Authentication & Authorization
-- [x] Email/password signup & login (verified ✅)
-- [x] Organization auto-creation on signup
-- [x] Role-based access control (owner/admin/editor/viewer/client_reviewer)
-- [x] Protected routes with AuthProvider
+### Problem
+Generated images in the Image Chat have Save/Download/Variations buttons but no way to schedule or publish them to social media.
 
-### Pages & UI
-- [x] Dashboard with stats cards and quick actions (verified ✅)
-- [x] Brand Kit — create/view brands with voice profiles (verified ✅)
-- [x] Content Studio — Text tab with streaming generation (verified ✅)
-- [x] Content Studio — Image tab with platform presets (verified ✅)
-- [x] Content Studio — Translate tab with multi-language support (verified ✅)
-- [x] Sidebar navigation with collapsible layout (verified ✅)
-- [ ] Asset Library (placeholder)
-- [ ] Content Calendar (placeholder)
-- [ ] Team Management (placeholder)
-- [ ] Workspaces (placeholder)
-- [ ] Settings (placeholder)
+### Solution
+Add a "Schedule / Publish" button to each generated image in `ImageChat.tsx`. When clicked, it opens the existing `PublishPanel` component (which already handles Facebook/Instagram publishing, scheduling, and approval workflows) in a dialog/sheet.
 
-### Database Tables
-- organizations, organization_members, user_roles
-- profiles
-- brands (with voice_profile, colors, fonts, prohibited_terms)
-- workspaces
+### Changes
 
-### Edge Functions
-- `generate-text` — SSE streaming text generation with brand voice
-- `generate-image` — AI image generation with platform presets
-- `translate-content` — Multi-language translation
+**`src/components/ImageChat.tsx`**
+1. Import `PublishPanel` and a `Dialog` (or `Sheet`) wrapper
+2. Add state: `publishImageUrl: string | null` and `publishPromptText: string`
+3. Add a "Schedule" button (with `CalendarDays` icon) next to Save/Download/Variations for each generated image
+4. When clicked, set `publishImageUrl` to that image's URL and open a Dialog containing `<PublishPanel content={publishPromptText} mediaUrl={publishImageUrl} hasContent={true} defaultTitle={publishPromptText} />`
+5. Same treatment for variation images in the grid
+6. Close dialog resets `publishImageUrl` to null
 
-### End-to-End Test Results (Verified 2026-03-05)
+This reuses the full PublishPanel with its Facebook/Instagram page selection, schedule date picker, immediate publish, and approval submission — no duplication needed.
 
-All core features were tested via browser automation against the live preview:
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Auth — Signup & Login | ✅ Verified | Email/password flow, redirect to dashboard, session persistence |
-| Dashboard | ✅ Verified | Stats cards, quick action tiles, sidebar navigation all render correctly |
-| Brand Kit — CRUD | ✅ Verified | Created "TechVibe" brand with playful tone, style guide, prohibited terms; card renders with voice badge |
-| Text Generation (streaming) | ✅ Verified | SSE streaming works, multi-variant output, channel presets (Instagram), copy button functional |
-| Brand Voice Integration | ✅ Verified | TechVibe brand voice correctly influenced text output — playful tone, emojis, avoided prohibited terms |
-| Image Generation | ✅ Verified | Platform presets work, skeleton loading state displays correctly, image renders with download button |
-| Translation (multi-language) | ✅ Verified | Spanish + French translations generated accurately, per-language copy buttons work, "Use generated text" cross-tab button works |
-| Sidebar Navigation | ✅ Verified | All nav links route correctly, collapsible sidebar works |
-
----
-
-## Next Steps (Priority Order)
-
-1. **Team Management** — Invite by email, role assignment, member list
-2. **Workspaces CRUD** — Create, rename, archive, switch workspaces
-3. **Asset Library** — Save generated content, browse/filter/search
-4. **Content Calendar** — Schedule and plan content publishing
-5. **Settings** — User profile, org settings, billing placeholder
