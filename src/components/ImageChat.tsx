@@ -6,10 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, Send, Save, Download, Layers, ChevronDown, Image, Sparkles, Settings2, RotateCcw } from "lucide-react";
+import { Loader2, Send, Save, Download, Layers, ChevronDown, Image, Sparkles, Settings2, RotateCcw, CalendarDays } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import PublishPanel from "@/components/PublishPanel";
 
 type Brand = Tables<"brands">;
 
