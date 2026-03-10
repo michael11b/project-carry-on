@@ -471,25 +471,59 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
       </div>
 
       {/* Input bar */}
-      <div className="flex items-end gap-2 mt-3">
-        <Textarea
-          ref={inputRef}
-          placeholder={messages.length === 0 ? "Describe the image you want to generate…" : "Refine, adjust, or describe a new image…"}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isGenerating}
-          className="min-h-[44px] max-h-[120px] resize-none text-sm"
-          rows={1}
-        />
-        <Button
-          onClick={() => handleSend()}
-          disabled={isGenerating || !input.trim()}
-          size="icon"
-          className="h-[44px] w-[44px] shrink-0"
-        >
-          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </Button>
+      <div className="mt-3 space-y-2">
+        {/* Reference image preview */}
+        {referenceImage && (
+          <div className="flex items-center gap-2 px-2">
+            <div className="relative">
+              <img src={referenceImage} alt="Reference" className="h-14 w-14 rounded-md border border-border object-cover" />
+              <button
+                onClick={() => setReferenceImage(null)}
+                className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </div>
+            <span className="text-xs text-muted-foreground">Reference image attached</span>
+          </div>
+        )}
+        <div className="flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isGenerating}
+            className="h-[44px] w-[44px] shrink-0"
+            title="Upload reference image"
+          >
+            <ImagePlus className="h-4 w-4" />
+          </Button>
+          <Textarea
+            ref={inputRef}
+            placeholder={messages.length === 0 ? "Describe the image you want to generate…" : "Refine, adjust, or describe a new image…"}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isGenerating}
+            className="min-h-[44px] max-h-[120px] resize-none text-sm"
+            rows={1}
+          />
+          <Button
+            onClick={() => handleSend()}
+            disabled={isGenerating || !input.trim()}
+            size="icon"
+            className="h-[44px] w-[44px] shrink-0"
+          >
+            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
 
       {/* Publish/Schedule Dialog */}
