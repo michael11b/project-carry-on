@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Download, Save, Facebook, ChevronDown, Settings2, Film, Type } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { FileText, Image, Volume2, Languages, Sparkles, Copy, Check, Loader2, Save, Facebook, ChevronDown, Settings2, Film, Type } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
