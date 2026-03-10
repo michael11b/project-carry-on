@@ -114,15 +114,14 @@ export default function Studio() {
     }
   }, [selectedPageProfileId, pageProfiles]);
 
-  // Image tab state
-  const [imagePrompt, setImagePrompt] = useState("");
-  const [imagePlatform, setImagePlatform] = useState<string>("");
-  const [imageBrandId, setImageBrandId] = useState<string>("");
-  const [imageUrl, setImageUrl] = useState<string>("");
-  const [imageDescription, setImageDescription] = useState("");
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [usedImagePlatform, setUsedImagePlatform] = useState<string>("");
-  const [usedImageBrand, setUsedImageBrand] = useState<string>("");
+  // Image chat gets brands, page context, and content type as props
+  const selectedPage = pageProfiles.find((p) => p.id === selectedPageProfileId);
+  const imagePageContext = (selectedPage || ctxDescription || ctxTone) ? {
+    page_name: selectedPage?.page_name || "",
+    description: ctxDescription,
+    content_tone: ctxTone,
+  } : undefined;
+  const imageContentType = selectedPage ? "facebook_post_image" : undefined;
 
   // Fetch brands and page profiles for the current user's org
   useEffect(() => {
