@@ -369,6 +369,15 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => { setPublishImageUrl(msg.imageUrl!); setPublishPromptText(msg.text || lastUserPrompt); }}
+                      className="gap-1 h-7 text-xs"
+                    >
+                      <CalendarDays className="h-3 w-3" />
+                      Schedule
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleVariations(3)}
                       disabled={isGenerating}
                       className="gap-1 h-7 text-xs"
