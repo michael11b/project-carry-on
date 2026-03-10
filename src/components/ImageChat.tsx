@@ -124,10 +124,13 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
     const userText = text || (isVariationRequest ? "Generate variations of this image" : "");
     if (!userText) return;
 
+    const currentRefImage = referenceImage;
+
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       text: userText,
+      referenceImageUrl: currentRefImage || undefined,
       timestamp: Date.now(),
     };
 
@@ -141,6 +144,7 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
 
     setMessages((prev) => [...prev, userMsg, loadingMsg]);
     setInput("");
+    setReferenceImage(null);
     setIsGenerating(true);
 
     const selectedBrand = brands.find((b) => b.id === brandId);
@@ -157,37 +161,34 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
     const allForAI = [
       ...prevMessages.map((m) => {
         if (m.role === "user") {
+          // Include reference images from previous user messages
+          const contentParts: any[] = [{ type: "text", text: m.text }];
+          if (m.referenceImageUrl) {
+            contentParts.push({ type: "image_url", image_url: { url: m.referenceImageUrl } });
+          }
           const prevAssistant = prevMessages
             .filter((pm) => pm.role === "assistant" && pm.timestamp < m.timestamp && pm.imageUrl)
             .pop();
           if (prevAssistant?.imageUrl) {
-            return {
-              role: "user" as const,
-              content: [
-                { type: "text", text: m.text },
-                { type: "image_url", image_url: { url: prevAssistant.imageUrl } },
-              ],
-            };
+            contentParts.push({ type: "image_url", image_url: { url: prevAssistant.imageUrl } });
           }
-          return { role: "user" as const, content: m.text };
+          return { role: "user" as const, content: contentParts.length > 1 ? contentParts : m.text };
         }
         return { role: "assistant" as const, content: m.text || "Image generated." };
       }),
       // Add the new user message
       (() => {
+        const contentParts: any[] = [{ type: "text", text: userText }];
+        if (currentRefImage) {
+          contentParts.push({ type: "image_url", image_url: { url: currentRefImage } });
+        }
         const lastImage = prevMessages
           .filter((m) => m.role === "assistant" && m.imageUrl)
           .pop();
         if (lastImage?.imageUrl) {
-          return {
-            role: "user" as const,
-            content: [
-              { type: "text", text: userText },
-              { type: "image_url", image_url: { url: lastImage.imageUrl } },
-            ],
-          };
+          contentParts.push({ type: "image_url", image_url: { url: lastImage.imageUrl } });
         }
-        return { role: "user" as const, content: userText };
+        return { role: "user" as const, content: contentParts.length > 1 ? contentParts : userText };
       })(),
     ];
 
