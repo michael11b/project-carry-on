@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, Send, Save, Download, Layers, ChevronDown, Image, Sparkles, Settings2, RotateCcw, CalendarDays } from "lucide-react";
+import { Loader2, Send, Save, Download, Layers, ChevronDown, Image, Sparkles, Settings2, RotateCcw, CalendarDays, ImagePlus, X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +31,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   text: string;
   imageUrl?: string;
+  referenceImageUrl?: string;
   variations?: Array<{ imageUrl: string; description: string }>;
   isLoading?: boolean;
   timestamp: number;
@@ -57,8 +58,27 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
   const [savingId, setSavingId] = useState<string | null>(null);
   const [publishImageUrl, setPublishImageUrl] = useState<string | null>(null);
   const [publishPromptText, setPublishPromptText] = useState("");
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please upload an image file.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Max 10MB allowed.", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setReferenceImage(reader.result as string);
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [toast]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -104,10 +124,13 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
     const userText = text || (isVariationRequest ? "Generate variations of this image" : "");
     if (!userText) return;
 
+    const currentRefImage = referenceImage;
+
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       text: userText,
+      referenceImageUrl: currentRefImage || undefined,
       timestamp: Date.now(),
     };
 
@@ -121,6 +144,7 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
 
     setMessages((prev) => [...prev, userMsg, loadingMsg]);
     setInput("");
+    setReferenceImage(null);
     setIsGenerating(true);
 
     const selectedBrand = brands.find((b) => b.id === brandId);
@@ -137,37 +161,34 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
     const allForAI = [
       ...prevMessages.map((m) => {
         if (m.role === "user") {
+          // Include reference images from previous user messages
+          const contentParts: any[] = [{ type: "text", text: m.text }];
+          if (m.referenceImageUrl) {
+            contentParts.push({ type: "image_url", image_url: { url: m.referenceImageUrl } });
+          }
           const prevAssistant = prevMessages
             .filter((pm) => pm.role === "assistant" && pm.timestamp < m.timestamp && pm.imageUrl)
             .pop();
           if (prevAssistant?.imageUrl) {
-            return {
-              role: "user" as const,
-              content: [
-                { type: "text", text: m.text },
-                { type: "image_url", image_url: { url: prevAssistant.imageUrl } },
-              ],
-            };
+            contentParts.push({ type: "image_url", image_url: { url: prevAssistant.imageUrl } });
           }
-          return { role: "user" as const, content: m.text };
+          return { role: "user" as const, content: contentParts.length > 1 ? contentParts : m.text };
         }
         return { role: "assistant" as const, content: m.text || "Image generated." };
       }),
       // Add the new user message
       (() => {
+        const contentParts: any[] = [{ type: "text", text: userText }];
+        if (currentRefImage) {
+          contentParts.push({ type: "image_url", image_url: { url: currentRefImage } });
+        }
         const lastImage = prevMessages
           .filter((m) => m.role === "assistant" && m.imageUrl)
           .pop();
         if (lastImage?.imageUrl) {
-          return {
-            role: "user" as const,
-            content: [
-              { type: "text", text: userText },
-              { type: "image_url", image_url: { url: lastImage.imageUrl } },
-            ],
-          };
+          contentParts.push({ type: "image_url", image_url: { url: lastImage.imageUrl } });
         }
-        return { role: "user" as const, content: userText };
+        return { role: "user" as const, content: contentParts.length > 1 ? contentParts : userText };
       })(),
     ];
 
@@ -332,6 +353,17 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted"
             }`}>
+              {/* Reference image thumbnail */}
+              {msg.role === "user" && msg.referenceImageUrl && (
+                <div className="mb-2">
+                  <p className="text-[10px] opacity-70 mb-1">Reference image:</p>
+                  <img
+                    src={msg.referenceImageUrl}
+                    alt="Reference"
+                    className="max-w-[120px] max-h-[120px] rounded-md border border-primary-foreground/20 object-cover"
+                  />
+                </div>
+              )}
               {/* Message text */}
               <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
 
@@ -439,25 +471,59 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
       </div>
 
       {/* Input bar */}
-      <div className="flex items-end gap-2 mt-3">
-        <Textarea
-          ref={inputRef}
-          placeholder={messages.length === 0 ? "Describe the image you want to generate…" : "Refine, adjust, or describe a new image…"}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isGenerating}
-          className="min-h-[44px] max-h-[120px] resize-none text-sm"
-          rows={1}
-        />
-        <Button
-          onClick={() => handleSend()}
-          disabled={isGenerating || !input.trim()}
-          size="icon"
-          className="h-[44px] w-[44px] shrink-0"
-        >
-          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </Button>
+      <div className="mt-3 space-y-2">
+        {/* Reference image preview */}
+        {referenceImage && (
+          <div className="flex items-center gap-2 px-2">
+            <div className="relative">
+              <img src={referenceImage} alt="Reference" className="h-14 w-14 rounded-md border border-border object-cover" />
+              <button
+                onClick={() => setReferenceImage(null)}
+                className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </div>
+            <span className="text-xs text-muted-foreground">Reference image attached</span>
+          </div>
+        )}
+        <div className="flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isGenerating}
+            className="h-[44px] w-[44px] shrink-0"
+            title="Upload reference image"
+          >
+            <ImagePlus className="h-4 w-4" />
+          </Button>
+          <Textarea
+            ref={inputRef}
+            placeholder={messages.length === 0 ? "Describe the image you want to generate…" : "Refine, adjust, or describe a new image…"}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isGenerating}
+            className="min-h-[44px] max-h-[120px] resize-none text-sm"
+            rows={1}
+          />
+          <Button
+            onClick={() => handleSend()}
+            disabled={isGenerating || !input.trim()}
+            size="icon"
+            className="h-[44px] w-[44px] shrink-0"
+          >
+            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
 
       {/* Publish/Schedule Dialog */}
