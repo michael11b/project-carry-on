@@ -6,10 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, Send, Save, Download, Layers, ChevronDown, Image, Sparkles, Settings2, RotateCcw } from "lucide-react";
+import { Loader2, Send, Save, Download, Layers, ChevronDown, Image, Sparkles, Settings2, RotateCcw, CalendarDays } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import PublishPanel from "@/components/PublishPanel";
 
 type Brand = Tables<"brands">;
 
@@ -53,6 +55,8 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
   const [brandId, setBrandId] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [publishImageUrl, setPublishImageUrl] = useState<string | null>(null);
+  const [publishPromptText, setPublishPromptText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -365,6 +369,15 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => { setPublishImageUrl(msg.imageUrl!); setPublishPromptText(msg.text || lastUserPrompt); }}
+                      className="gap-1 h-7 text-xs"
+                    >
+                      <CalendarDays className="h-3 w-3" />
+                      Schedule
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleVariations(3)}
                       disabled={isGenerating}
                       className="gap-1 h-7 text-xs"
@@ -406,6 +419,14 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
                           >
                             <Download className="h-3 w-3" />
                           </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => { setPublishImageUrl(v.imageUrl); setPublishPromptText(v.description || lastUserPrompt); }}
+                            className="h-6 w-6 p-0"
+                          >
+                            <CalendarDays className="h-3 w-3" />
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -438,6 +459,20 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
           {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>
       </div>
+
+      {/* Publish/Schedule Dialog */}
+      <Dialog open={!!publishImageUrl} onOpenChange={(open) => { if (!open) setPublishImageUrl(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          {publishImageUrl && (
+            <PublishPanel
+              content={publishPromptText}
+              mediaUrl={publishImageUrl}
+              hasContent={true}
+              defaultTitle={publishPromptText.slice(0, 80)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
