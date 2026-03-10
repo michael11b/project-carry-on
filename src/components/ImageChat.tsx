@@ -353,6 +353,17 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted"
             }`}>
+              {/* Reference image thumbnail */}
+              {msg.role === "user" && msg.referenceImageUrl && (
+                <div className="mb-2">
+                  <p className="text-[10px] opacity-70 mb-1">Reference image:</p>
+                  <img
+                    src={msg.referenceImageUrl}
+                    alt="Reference"
+                    className="max-w-[120px] max-h-[120px] rounded-md border border-primary-foreground/20 object-cover"
+                  />
+                </div>
+              )}
               {/* Message text */}
               <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
 
