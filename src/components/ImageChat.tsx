@@ -459,6 +459,20 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
           {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>
       </div>
+
+      {/* Publish/Schedule Dialog */}
+      <Dialog open={!!publishImageUrl} onOpenChange={(open) => { if (!open) setPublishImageUrl(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          {publishImageUrl && (
+            <PublishPanel
+              content={publishPromptText}
+              mediaUrl={publishImageUrl}
+              hasContent={true}
+              defaultTitle={publishPromptText.slice(0, 80)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
