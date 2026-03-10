@@ -419,6 +419,14 @@ export default function ImageChat({ brands, pageContext, contentType }: ImageCha
                           >
                             <Download className="h-3 w-3" />
                           </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => { setPublishImageUrl(v.imageUrl); setPublishPromptText(v.description || lastUserPrompt); }}
+                            className="h-6 w-6 p-0"
+                          >
+                            <CalendarDays className="h-3 w-3" />
+                          </Button>
                         </div>
                       </div>
                     ))}
